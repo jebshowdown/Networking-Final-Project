@@ -13,7 +13,7 @@ def validate_email_fields(title, content):
         raise ValueError("Content is too long. Maximum is 1000000 characters.")
 
 
-def build_email_message(sender, receivers, title, content):
+def build_email_message(sender, receivers, title, content) -> str:
    
     validate_email_fields(title, content)  # check that title and content follow the rules
     content_length = len(content) # counts how many characters are in the content
@@ -37,16 +37,17 @@ def client():
     try:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect((server_name,server_port))
-        username = input(client_socket.recv(256).decode('UTF-8')) # print username prompt and wait for input
+        username = input("Enter your username: ") # print username prompt and wait for input
 
         # *encrypt username and password before sending*
 
         client_socket.send(username.encode('UTF-8')) # send the username
-        password = input(client_socket.recv(64).decode()) # receive prompt for password
+        password = input("Enter your password: ") # receive prompt for password
         client_socket.send(password.encode()) # send the password to the server
 
     except socket.error as e:
         print('Error in client socket creation:',e)
+        client_socket.close()
         sys.exit(1)    
 
     while True:
@@ -98,7 +99,11 @@ def client():
 
 client()
 
+def encrypt(data, key):
+    pass
 
+def decrypt(data, key):
+    pass
 
 # # Test for building email
 # try:
