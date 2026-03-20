@@ -72,7 +72,22 @@ def client_login_check(username, password):
         return True
 
     return False
+def send_sym_key(connection, sym_key):
+    """
+    Purpose: Sends the symmetric key to the client
+    Parameters: connection (socket), sym_key (bytes)
+    Returns: None
+    """
+    connection.send(sym_key)
 
+def print_connection_success(username):
+    """
+    Purpose: Prints the required success message on the server
+    Parameters: username (str)
+    Returns: None
+    """
+    print("Connection Accepted and Symmetric Key Generated for client: " + username)
+    
 def test_generate_sym_key():
     """
     Purpose: Test the generate_sym_key function
