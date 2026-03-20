@@ -99,9 +99,24 @@ def test_generate_sym_key():
     assert len(sym_key) == 32, f"Expected 32 bytes, got {len(sym_key)}"
     print("test_generate_sym_key passed successfully!")
 
+
+# ---- Asymmetric Encryption (RSA) Helper Function ----
+# Purpose: Encrypt the symmetric key using RSA encryption
+# Input: data (bytes), public_key_path (string)
+# Output: encrypted data (bytes)
+# -----------------------------------------------------
+def asym_encrypt(data: bytes, public_key_path: str) -> bytes:
+    recipient_key = RSA.import_key(open(public_key_path).read()) # imports the public key
+    cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
+    
+    # Encrypt and return raw bytes
+    return cipher_rsa.encrypt(data)
+
 def main():
     connection = server_start()
     send_pub_key(connection)
+    sym_key = get_random_bytes(32) # generate a symmetric key
+    asym_encrypt(sym_key, username + "_public.pem") # encrypt the symmetric key using the client's public key
     return
 
 
