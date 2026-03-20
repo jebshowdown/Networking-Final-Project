@@ -2,6 +2,7 @@ from Crypto.Random import get_random_bytes
 import socket
 import sys
 from datetime import date, datetime
+import json
 
 def server_start() -> socket:
     """
@@ -47,7 +48,30 @@ def generate_sym_key() -> bytes:
     Returns: symmetric key (bytes)
     """
     return get_random_bytes(32)
+def load_user_passwords():
 
+    """
+    Purpose: Loads usernames and passwords 
+    Parameters: None
+    Returns: dictionary of usernames and passwords
+    """
+    with open("user_pass.json", "r") as f:
+        user_data = json.load(f)
+
+    return user_data
+
+def client_login_check(username, password):
+    """
+    Purpose: Checks if the client's username and password match 
+    Parameters: username (str), password (str)
+    Returns: True if login is correct, otherwise False
+    """
+    user_data = load_user_passwords()
+
+    if username in user_data and user_data[username] == password:
+        return True
+
+    return False
 
 def test_generate_sym_key():
     """
