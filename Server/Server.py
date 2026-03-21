@@ -72,13 +72,13 @@ def client_login_check(username, password):
         return True
 
     return False
-def send_sym_key(connection, sym_key):
+def send_sym_key(connection, encrypted_sym_key):
     """
-    Purpose: Sends the symmetric key to the client
-    Parameters: connection (socket), sym_key (bytes)
+    Purpose: Sends the encrypted symmetric key to the client
+    Parameters: connection (socket), encrypted_sym_key (bytes)
     Returns: None
     """
-    connection.send(sym_key)
+    connection.send(encrypted_sym_key)
 
 def print_connection_success(username):
     """
@@ -87,6 +87,43 @@ def print_connection_success(username):
     Returns: None
     """
     print("Connection Accepted and Symmetric Key Generated for client: " + username)
+
+def send_invalid_login(connection, username):
+    """
+    Purpose: it sends the invalid login message to the client, prints the required
+             server message, and closes the connection
+    Parameters: connection (socket), username (str)
+    Returns: None
+    """
+    connection.send("Invalid username or password".encode("utf-8"))
+    print(f"The received client information: {username} is invalid (Connection Terminated).")
+    connection.close()
+
+def receive_client_credentials(connection):
+    """
+    Purpose: Receives the encrypted username and password from the client,
+             decrypts them using the server private key, and returns both
+    Parameters: connection (socket)
+    Returns: username (str), password (str)
+    """
+    encrypted_data = connection.recv(1024)
+
+    with open("server_private.pem", "rb") as f:
+        server_private_key = RSA.import_key(f.read())
+
+    cipher_rsa = PKCS1_OAEP.new(server_private_key)
+    decrypted_data = cipher_rsa.decrypt(encrypted_data).decode("utf-8")
+
+    username, password = decrypted_data.split("\n")
+    return username, password
+def terminate_connection(connection, username):
+    """
+    Purpose: Terminates the connection with the client 
+    Parameters: connection (socket), username (str)
+    Returns: None
+    """
+    print(f"Terminating connection with {username}.")
+    connection.close()
     
 def test_generate_sym_key():
     """
@@ -115,11 +152,19 @@ def asym_encrypt(data: bytes, public_key_path: str) -> bytes:
 def main():
     connection = server_start()
     send_pub_key(connection)
-    sym_key = get_random_bytes(32) # generate a symmetric key
-    asym_encrypt(sym_key, username + "_public.pem") # encrypt the symmetric key using the client's public key
-    return
 
+    username, password = receive_client_credentials(connection)
 
+    if client_login_check(username, password):
+        sym_key = generate_sym_key() # generate a symmetric key
+        encrypted_sym_key = asym_encrypt(sym_key, username + "_public.pem")  # encrypt the symmetric key using the client's public key
+        send_sym_key(connection, encrypted_sym_key)
+        print_connection_success(username)
+        return
+    
+    else:
+        send_invalid_login(connection, username)
+        return
 
 if __name__ == "__main__":
     main()
