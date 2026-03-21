@@ -56,7 +56,7 @@ def sym_encrypt(data: str, sym_key: bytes) -> bytes:
     padded_data = pad(data.encode('utf-8'), AES.block_size) # pads the data
     return cipher_aes.encrypt(padded_data) # encrypts and returns the data in bytes
 
-def sym_decrypt(data: bytes, sym_key: bytes) -> bytes: 
+def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
     padded_data = pad(data.decode('utf-8'), AES.block_size) # pads the data
     return cipher_aes.decrypt(padded_data) # encrypts and returns the data in bytes
