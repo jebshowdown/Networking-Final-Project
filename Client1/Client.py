@@ -56,6 +56,11 @@ def sym_encrypt(data: str, sym_key: bytes) -> bytes:
     padded_data = pad(data.encode('utf-8'), AES.block_size) # pads the data
     return cipher_aes.encrypt(padded_data) # encrypts and returns the data in bytes
 
+def sym_decrypt(data: bytes, sym_key: bytes) -> bytes: 
+    cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
+    padded_data = pad(data.decode('utf-8'), AES.block_size) # pads the data
+    return cipher_aes.decrypt(padded_data) # encrypts and returns the data in bytes
+
 def client():
     server_name = str(input("Enter the server IP or name: ")) # switch to ipv4 of another computer on the network to transfer between computers
     server_port = 13000
@@ -132,8 +137,6 @@ def client():
 
 client()
 
-def asym_decrypt(data, key):
-    pass
 
 # # Test for building email
 # try:
