@@ -1,4 +1,6 @@
 from Crypto.Random import get_random_bytes
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP, AES
 import socket
 import sys
 from datetime import date, datetime

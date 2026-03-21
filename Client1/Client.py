@@ -65,8 +65,8 @@ def client():
         client_socket.connect((server_name,server_port)) # connect to the server
         
         # Are we receiving the prompt for username and password from server or is client generating it?
-        username = input(client_socket.recv(256).decode('UTF-8')) # print username prompt and wait for input
-        password = input(client_socket.recv(64).decode()) # receive prompt for password
+        username = input("Enter the Username: ") # print username prompt and wait for input
+        password = input("Enter the password: ") # receive prompt for password
         # ---------------------------------------------------------------------------------------------
         
         # Combine the username and password into a single string
@@ -90,7 +90,7 @@ def client():
     while True:
 
         try:
-            choice = str(input(choice_msg)) # get the choice from the user
+            choice = str(input()) # get the choice from the user
             client_socket.send(choice.encode('UTF-8')) # send choice to server
 
             if choice == '1':
@@ -132,10 +132,7 @@ def client():
 
 client()
 
-def encrypt(data, key):
-    pass
-
-def decrypt(data, key):
+def asym_decrypt(data, key):
     pass
 
 # # Test for building email
