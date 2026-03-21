@@ -58,8 +58,8 @@ def sym_encrypt(data: str, sym_key: bytes) -> bytes:
 
 def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
-    padded_data = pad(data.decode('utf-8'), AES.block_size) # pads the data
-    return cipher_aes.decrypt(padded_data) # encrypts and returns the data in bytes
+    padded_decrypted = cipher_aes.decrypt(data) # encrypts and returns the data in bytes
+    return unpad(padded_decrypted, AES.block_size).decode('UTF-8')
 
 def client():
     server_name = str(input("Enter the server IP or name: ")) # switch to ipv4 of another computer on the network to transfer between computers
