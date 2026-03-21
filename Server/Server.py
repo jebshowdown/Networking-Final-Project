@@ -44,15 +44,6 @@ def send_pub_key(connected_socket):
         ser_pub_key = f.read()
     connected_socket.send(ser_pub_key.encode()) # automatically share public key with client
 
-
-def generate_sym_key() -> bytes:
-    """
-    Purpose: Generate a symmetric key for a user
-    Parameters: None
-    Returns: symmetric key (bytes)
-    """
-    return get_random_bytes(32)
-
 def load_user_passwords():
 
     """
@@ -77,6 +68,7 @@ def client_login_check(username, password):
         return True
 
     return False
+
 def send_sym_key(connection, encrypted_sym_key):
     """
     Purpose: Sends the encrypted symmetric key to the client
@@ -283,7 +275,7 @@ def main():
     username, password = receive_client_credentials(connection)
 
     if client_login_check(username, password):
-        sym_key = generate_sym_key() # generate a symmetric key
+        sym_key = get_random_bytes(32) # generate a symmetric key
         encrypted_sym_key = asym_encrypt(sym_key, username + "_public.pem")  # encrypt the symmetric key using the client's public key
         send_sym_key(connection, encrypted_sym_key)
         print_connection_success(username)
