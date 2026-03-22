@@ -58,8 +58,8 @@ def sym_encrypt(data: str, sym_key: bytes) -> bytes:
 
 def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
-    padded_decrypted = cipher_aes.decrypt(data) # encrypts and returns the data in bytes
-    return unpad(padded_decrypted, AES.block_size).decode('UTF-8')
+    padded_decrypted = cipher_aes.decrypt(data) # decrypts the data in string
+    return unpad(padded_decrypted, AES.block_size).decode('UTF-8') # unpads, decodes, and returns the string
 
 def client():
     server_name = str(input("Enter the server IP or name: ")) # switch to ipv4 of another computer on the network to transfer between computers
@@ -80,6 +80,12 @@ def client():
         encrypted_user_credentials = asym_encrypt(user_credentials, "server_public.pem")
         # Send the encrypted username and password to the server
         client_socket.send(encrypted_user_credentials)
+
+        # Decrypt the server response (sym_key), encrypt and send OK message
+        sym_key = sym_decrypt(client_socket.recv(1024).decode(), username + "_public.pem")
+        msg = 'OK'
+        client_socket.send(sym_encrypt(msg.encode(), sym_key))
+
 
         # Check if the client received "Invalid username or password.\nTerminating" from the server
         if client_socket.recv(64).decode('UTF-8') == "Invalid username or password.\nTerminating":

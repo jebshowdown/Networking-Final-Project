@@ -1,6 +1,7 @@
 from Crypto.Random import get_random_bytes
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP, AES
+from Crypto.Util.Padding import pad, unpad
 import socket
 import sys
 from datetime import date, datetime
@@ -50,6 +51,7 @@ def generate_sym_key() -> bytes:
     Returns: symmetric key (bytes)
     """
     return get_random_bytes(32)
+
 def load_user_passwords():
 
     """
@@ -118,6 +120,7 @@ def receive_client_credentials(connection):
 
     username, password = decrypted_data.split("\n")
     return username, password
+
 def terminate_connection(connection, username):
     """
     Purpose: Terminates the connection with the client 
@@ -137,6 +140,21 @@ def test_generate_sym_key():
     print(sym_key.hex())
     assert len(sym_key) == 32, f"Expected 32 bytes, got {len(sym_key)}"
     print("test_generate_sym_key passed successfully!")
+
+def sym_encrypt(data: str, sym_key: bytes) -> bytes:
+    cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
+    padded_data = pad(data.encode('utf-8'), AES.block_size) # pads the data
+    return cipher_aes.encrypt(padded_data) # encrypts and returns the data in bytes
+
+def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
+    cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
+    padded_decrypted = cipher_aes.decrypt(data) # decrypts the data in string
+    return unpad(padded_decrypted, AES.block_size).decode('UTF-8') # unpads, decodes, and returns the string
+
+
+def receive_email_info(connection, sym_key):
+    email_msg = sym_decrypt(connection.recv(1024).decode("UTF-8"), sym_key)
+    #*** parse msg info and print to server screen
 
 
 # ---- Asymmetric Encryption (RSA) Helper Function ----
