@@ -152,10 +152,52 @@ def sym_decrypt(data: bytes, sym_key: bytes) -> str:
     return unpad(padded_decrypted, AES.block_size).decode('UTF-8') # unpads, decodes, and returns the string
 
 
-def receive_email_info(connection, sym_key):
+def parse_email_info(connection: socket, sym_key: str) -> None:
+    """
+    Purpose: parses email info when an email is received by server
+    Parameters: connection -> socket: the socket connection
+                sym_key -> str: the symmetric key for the server
+    Returns: sender -> str: the name of the sending client
+            title -> str: the email title
+            receivers -> str: the names of the receiving client(s)
+            content_len -> str: the length of the content in bytes
+            content -> str: the email content
+    """
     email_msg = sym_decrypt(connection.recv(1024).decode("UTF-8"), sym_key)
-    #*** parse msg info and print to server screen
+    email_parts = email_msg.split("\n")
+    sender = email_parts[0].replace("From: ", "")
+    receivers = email_parts[1].replace("To: ", "")
+    time = datetime.now()
+    title = email_parts[2].replace("Title: ", "")
+    content_len = email_parts[3].replace("Content Length: ", "")
+    content = "\n".join(email_parts[5:])
 
+    print(f"An email from {sender} is sent to {receivers} has a content length of {content_len}\n")
+    return sender, receivers, time, title, content_len, content
+
+def construct_email_file(sender, receivers, time, title, content_len, content):
+    """
+        Purpose: Creates and saves email record to text file
+    Parameters: sender -> str: the name of the sending client
+            title -> str: the email title
+            receivers -> str: the names of the receiving client(s)
+            content_len -> str: the length of the content in bytes
+            content -> str: the email content
+    Returns: None
+    """
+    content = (
+        "From: " + sender + "\n"
+        "To: " + receivers + "\n"
+        "Time and Date Received: " + time + "\n"
+        "Title: " + title + "\n"
+        "Content Length: " + str(content_len) + "\n"
+        "Content: \n"
+        + content
+    )
+    
+    with open(f"{sender}/{sender}_{title}.txt", "w") as f: # saves file in client directory **change name if needed
+        f.write(content)
+    
 
 # ---- Asymmetric Encryption (RSA) Helper Function ----
 # Purpose: Encrypt the symmetric key using RSA encryption
