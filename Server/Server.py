@@ -7,6 +7,9 @@ import sys
 from datetime import date, datetime
 import json
 
+CLIENT_INBOX = ["Index   From            DateTime                    Title\n"]
+CLIENT_INBOX_COUNT = 1
+
 def server_start() -> socket:
     """
     Purpose: Starts the server and listens, if a connection is made it returns the connection socket
@@ -172,12 +175,14 @@ def parse_email_info(connection: socket, sym_key: str) -> None:
     content_len = email_parts[3].replace("Content Length: ", "")
     content = "\n".join(email_parts[5:])
 
+    CLIENT_INBOX.append("{0:2}{1:8}{2:24}{3:36}{4:}\n".format(CLIENT_INBOX_COUNT, sender, time, title)) # add entry to inbox list
+    CLIENT_INBOX_COUNT +=1 # increment index for inbox list
     print(f"An email from {sender} is sent to {receivers} has a content length of {content_len}\n")
     return sender, receivers, time, title, content_len, content
 
 def construct_email_file(sender, receivers, time, title, content_len, content):
     """
-        Purpose: Creates and saves email record to text file
+    Purpose: Creates and saves email record to text file
     Parameters: sender -> str: the name of the sending client
             title -> str: the email title
             receivers -> str: the names of the receiving client(s)
@@ -195,9 +200,45 @@ def construct_email_file(sender, receivers, time, title, content_len, content):
         + content
     )
     
-    with open(f"{sender}/{sender}_{title}.txt", "w") as f: # saves file in client directory **change name if needed
-        f.write(content)
+    for client in ";".split(receivers):
+        with open(f"{client}/{client}_{title}.txt", "w") as f: # saves file in client directory **change name if needed
+            f.write(content)
     
+# ------View Inbox Subprotocol------
+def send_inbox(connection: socket, sym_key: str) -> None:
+    """
+    Purpose: Creates a string representing the inbox, encrypts it, and sends to client
+    Parameters: connection -> socket: the client connection socket
+    sym_key: string -> the sym key to encrypt email data
+    Returns: None
+    """
+    connection.send(sym_encrypt("".join(CLIENT_INBOX).encode(), sym_key))
+    ok_msg = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key)
+    print(ok_msg)
+
+#------View Email Subprotocol------
+def send_email_by_index(client, connection: socket, sym_key: str) -> None:
+    """
+    Purpose: Finds an email in file, encrypts it, and sends to client
+    Parameters: client -> str: the current client user
+    connection -> socket: the client connection socket
+    sym_key: string -> the sym key to encrypt email data
+    Returns: None
+    """
+    msg = "The server request email index: "
+    connection.send(sym_encrypt(msg.encode("UTF-8"), sym_key))
+
+    index = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key)
+    inbox_entry = CLIENT_INBOX[index] 
+    start = inbox_entry.find("Title: ") + 7
+    stop = inbox_entry.find("Content Length: ") - 2  
+    title = inbox_entry[start:stop]
+
+    with open(f"{client}_{title}.txt", "r") as f:
+        email = f.read()
+    
+    connection.send(sym_encrypt(email.encode("UTF-8"), sym_key))
+
 
 # ---- Asymmetric Encryption (RSA) Helper Function ----
 # Purpose: Encrypt the symmetric key using RSA encryption
