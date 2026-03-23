@@ -7,8 +7,6 @@ import sys
 from datetime import date, datetime
 import json
 
-CLIENT_INBOX = ["Index   From            DateTime                    Title\n"]
-CLIENT_INBOX_COUNT = 1
 
 def server_start() -> socket:
     """
@@ -155,7 +153,7 @@ def sym_decrypt(data: bytes, sym_key: bytes) -> str:
     return unpad(padded_decrypted, AES.block_size).decode('UTF-8') # unpads, decodes, and returns the string
 
 
-def parse_email_info(connection: socket, sym_key: str) -> None:
+def parse_email_info(client: str, connection: socket, sym_key: str) -> None:
     """
     Purpose: parses email info when an email is received by server
     Parameters: connection -> socket: the socket connection
@@ -175,10 +173,29 @@ def parse_email_info(connection: socket, sym_key: str) -> None:
     content_len = email_parts[3].replace("Content Length: ", "")
     content = "\n".join(email_parts[5:])
 
-    CLIENT_INBOX.append("{0:2}{1:8}{2:24}{3:36}{4:}\n".format(CLIENT_INBOX_COUNT, sender, time, title)) # add entry to inbox list
-    CLIENT_INBOX_COUNT +=1 # increment index for inbox list
+    add_to_inbox_list(client, sender, time, title) 
+
     print(f"An email from {sender} is sent to {receivers} has a content length of {content_len}\n")
     return sender, receivers, time, title, content_len, content
+
+def add_to_inbox_list(client, sender, time, title):
+    """
+    Purpose: Adds entry to the inbox json database
+    Parameters: client -> str: the current client
+                sender -> str: the name of the sender
+                time -> str: the time of sending
+                title -> the title of sent email
+    Returns: None
+    """
+    with open(f"{client}_inbox.json", 'r+') as f: # check to see if the json file is already populated
+        try:
+            inbox = json.load(f) # read the contents of the JSON file
+        except json.decoder.JSONDecodeError: # if the JSON is empty, create a new list to populate the file with
+            inbox = []
+
+        inbox.append("{0:2}{1:8}{2:24}{3:36}{4:}\n".format(str(len(inbox)+1), sender, time, title)) # add entry to inbox list
+        json.dump(inbox,f)
+
 
 def construct_email_file(sender, receivers, time, title, content_len, content):
     """
@@ -205,19 +222,24 @@ def construct_email_file(sender, receivers, time, title, content_len, content):
             f.write(content)
     
 # ------View Inbox Subprotocol------
-def send_inbox(connection: socket, sym_key: str) -> None:
+def send_inbox(client:str, connection: socket, sym_key: str) -> None:
     """
     Purpose: Creates a string representing the inbox, encrypts it, and sends to client
     Parameters: connection -> socket: the client connection socket
     sym_key: string -> the sym key to encrypt email data
     Returns: None
     """
-    connection.send(sym_encrypt("".join(CLIENT_INBOX).encode(), sym_key))
+    with open(f"{client}_database.json", "r") as f:
+        inbox = f.read()
+    inbox = " ".join(inbox)
+    inbox_str = "Index  From            DateTime                Title\n" * inbox 
+
+    connection.send(sym_encrypt(inbox_str.encode(), sym_key))
     ok_msg = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key)
     print(ok_msg)
 
 #------View Email Subprotocol------
-def send_email_by_index(client, connection: socket, sym_key: str) -> None:
+def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
     """
     Purpose: Finds an email in file, encrypts it, and sends to client
     Parameters: client -> str: the current client user
@@ -225,11 +247,13 @@ def send_email_by_index(client, connection: socket, sym_key: str) -> None:
     sym_key: string -> the sym key to encrypt email data
     Returns: None
     """
+    with open(f"{client}_database.json", "r") as f:
+        inbox = f.read()
     msg = "The server request email index: "
     connection.send(sym_encrypt(msg.encode("UTF-8"), sym_key))
 
     index = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key)
-    inbox_entry = CLIENT_INBOX[index] 
+    inbox_entry = inbox[index] 
     start = inbox_entry.find("Title: ") + 7
     stop = inbox_entry.find("Content Length: ") - 2  
     title = inbox_entry[start:stop]
