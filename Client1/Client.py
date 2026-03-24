@@ -44,7 +44,7 @@ def asym_encrypt(data: str, public_key_path: str) -> bytes:
     cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
     
     # Encrypt and return raw bytes
-    return cipher_rsa.encrypt(data.encode('utf-8'))
+    return cipher_rsa.encrypt(data.encode())
 
 # ---- Symmetric Encryption (AES-ECB) Helper Function ----
 # Purpose: Encrypt using AES encryption the email message
@@ -53,13 +53,13 @@ def asym_encrypt(data: str, public_key_path: str) -> bytes:
 # --------------------------------------------------------
 def sym_encrypt(data: str, sym_key: bytes) -> bytes:
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
-    padded_data = pad(data.encode('utf-8'), AES.block_size) # pads the data
+    padded_data = pad(data.encode(), AES.block_size) # pads the data
     return cipher_aes.encrypt(padded_data) # encrypts and returns the data in bytes
 
 def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
     padded_decrypted = cipher_aes.decrypt(data) # decrypts the data in string
-    return unpad(padded_decrypted, AES.block_size).decode('UTF-8') # unpads, decodes, and returns the string
+    return unpad(padded_decrypted, AES.block_size).decode() # unpads, decodes, and returns the string
 
 def client():
     server_name = str(input("Enter the server IP or name: ")) # switch to ipv4 of another computer on the network to transfer between computers
@@ -69,7 +69,10 @@ def client():
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # create a socket
         client_socket.connect((server_name,server_port)) # connect to the server
         
-        # Are we receiving the prompt for username and password from server or is client generating it?
+        with open("server_public.pem", "w") as f:
+            pub_key = (client_socket.recv(1024).decode())
+            f.write(pub_key)
+
         username = input("Enter the Username: ") # print username prompt and wait for input
         password = input("Enter the password: ") # receive prompt for password
         # ---------------------------------------------------------------------------------------------
@@ -88,7 +91,7 @@ def client():
 
 
         # Check if the client received "Invalid username or password.\nTerminating" from the server
-        if client_socket.recv(64).decode('UTF-8') == "Invalid username or password.\nTerminating":
+        if client_socket.recv(1024).decode() == "Invalid username or password.\nTerminating":
             print("Invalid username or password.")
             client_socket.close()
             sys.exit(1)
@@ -102,7 +105,7 @@ def client():
 
         try:
             choice = str(input()) # get the choice from the user
-            client_socket.send(choice.encode('UTF-8')) # send choice to server
+            client_socket.send(sym_encrypt(choice.encode(), sym_key)) # send choice to server
 
             if choice == '1':
                 try:
@@ -120,7 +123,7 @@ def client():
 
                     email_message = build_email_message(username, receivers, title, content) #build email format 
                     # This should be encrypted first before sending to the server
-                    client_socket.send(email_message.encode('UTF-8')) # sends email to server 
+                    client_socket.send(email_message.encode()) # sends email to server 
 
                     print("The message is sent to the server.")
 
@@ -130,11 +133,20 @@ def client():
                     print("Email content error:", e)
                 
             elif choice == '2':
-                pass #inbox display subprotocol
+                # inbox display subprotocol
+                print(sym_decrypt(client_socket.recv(2048).decode(), sym_key))
+                ok_msg = "OK"
+                client_socket.send(sym_encrypt(ok_msg.encode(), sym_key))
+                
             elif choice == '3':
-                pass #Display email contents subprotocol
+                # Display email contents subprotocol
+                index_choice = input(sym_decrypt(client_socket.recv(64).decode(), sym_key))
+                client_socket.send(sym_encrypt(index_choice.encode(), sym_key))
+                print(sym_decrypt(client_socket.recv(2048).decode(), sym_key))
+
             elif choice == '4':
-                pass #Terminate program subprotocol
+                print("The connection is terminated with server")
+                sys.exit(1)
 
         except socket.error as e:
             print('Error:',e)

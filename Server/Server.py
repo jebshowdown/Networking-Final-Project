@@ -229,10 +229,10 @@ def send_inbox(client:str, connection: socket, sym_key: str) -> None:
     sym_key: string -> the sym key to encrypt email data
     Returns: None
     """
-    with open(f"{client}_database.json", "r") as f:
+    with open(f"{client}/{client}_database.json", "r") as f:
         inbox = f.read()
     inbox = " ".join(inbox)
-    inbox_str = "Index  From            DateTime                Title\n" * inbox 
+    inbox_str = "Index  From            DateTime                Title\n" + inbox 
 
     connection.send(sym_encrypt(inbox_str.encode(), sym_key))
     ok_msg = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key)
@@ -247,7 +247,7 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
     sym_key: string -> the sym key to encrypt email data
     Returns: None
     """
-    with open(f"{client}_database.json", "r") as f:
+    with open(f"{client}/{client}_database.json", "r") as f:
         inbox = f.read()
     msg = "The server request email index: "
     connection.send(sym_encrypt(msg.encode("UTF-8"), sym_key))
@@ -258,7 +258,7 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
     stop = inbox_entry.find("Content Length: ") - 2  
     title = inbox_entry[start:stop]
 
-    with open(f"{client}_{title}.txt", "r") as f:
+    with open(f"{client}/{client}_{title}.txt", "r") as f:
         email = f.read()
     
     connection.send(sym_encrypt(email.encode("UTF-8"), sym_key))
@@ -287,11 +287,35 @@ def main():
         encrypted_sym_key = asym_encrypt(sym_key, username + "_public.pem")  # encrypt the symmetric key using the client's public key
         send_sym_key(connection, encrypted_sym_key)
         print_connection_success(username)
-        return
+        
     
     else:
         send_invalid_login(connection, username)
-        return
+        
+    
+    while True:
+        try:
+            choice = sym_decrypt(connection.recv(1024).decode("UTF-8"), sym_key)
+
+            if choice == "1":
+                # create and send email
+                pass
+            elif choice == "2":
+                # display inbox subprotocol
+                send_inbox(username, connection, sym_key)
+            elif choice == "3":
+                # display email content subprotocol
+                send_email_by_index(username, connection, sym_key)
+            elif choice == "4":
+                # terminate connection subprotocol
+                connection.close()
+                print(f"Terminating connection with {username}")
+
+
+        except socket.error as error:
+            print('Error:', error)
+            connection.close()
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
