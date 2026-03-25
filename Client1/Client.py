@@ -46,6 +46,13 @@ def asym_encrypt(data: str, public_key_path: str) -> bytes:
     # Encrypt and return raw bytes
     return cipher_rsa.encrypt(data.encode())
 
+def asym_decrypt(data: bytes, private_key_path: str) -> str:
+    recipient_key = RSA.import_key(open(private_key_path).read()) # imports the private key
+    cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
+    
+    # Decrypt and return raw bytes
+    return cipher_rsa.decrypt(data).decode()
+
 # ---- Symmetric Encryption (AES-ECB) Helper Function ----
 # Purpose: Encrypt using AES encryption the email message
 # Input: data (string), key (bytes)
@@ -97,7 +104,7 @@ def client():
         username, password = send_user_credentials(client_socket)
 
         # Decrypt the server response (sym_key), encrypt and send OK message
-        sym_key = sym_decrypt(client_socket.recv(1024).decode(), username + "_public.pem")
+        sym_key = asym_decrypt(client_socket.recv(1024).decode(), username + "_private.pem")
         msg = 'OK'
         client_socket.send(sym_encrypt(msg.encode(), sym_key))
 
