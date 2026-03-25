@@ -5,6 +5,7 @@ from Crypto.Util.Padding import pad, unpad
 import socket
 import sys
 from datetime import date, datetime
+import os
 import json
 
 
@@ -218,7 +219,7 @@ def construct_email_file(sender, receivers, time, title, content_len, content):
     )
     
     for client in ";".split(receivers):
-        with open(f"{client}/{client}_{title}.txt", "w") as f: # saves file in client directory **change name if needed
+        with open(f"{client}/{client}_{title}.txt", "w") as f: # saves file in client directory
             f.write(content)
     
 # ------View Inbox Subprotocol------
@@ -253,7 +254,7 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
     connection.send(sym_encrypt(msg.encode("UTF-8"), sym_key))
 
     index = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key)
-    inbox_entry = inbox[index] 
+    inbox_entry = inbox[index] # index should correspond to index wihtin json list
     start = inbox_entry.find("Title: ") + 7
     stop = inbox_entry.find("Content Length: ") - 2  
     title = inbox_entry[start:stop]

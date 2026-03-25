@@ -61,6 +61,27 @@ def sym_decrypt(data: bytes, sym_key: bytes) -> str:
     padded_decrypted = cipher_aes.decrypt(data) # decrypts the data in string
     return unpad(padded_decrypted, AES.block_size).decode() # unpads, decodes, and returns the string
 
+def send_user_credentials(connection):
+    """
+    Purpose: Prompts user for credentials, encrypts and sends them
+    Parameters: connection -> socket: the client connection socket
+    Returns: Username -> str: the client's username
+             Password -> str: the client's password
+    """
+    username = input("Enter the Username: ") # print username prompt and wait for input
+    password = input("Enter the password: ") # receive prompt for password
+    
+    # Combine the username and password into a single string
+    user_credentials = username + " " + password
+    # Encrypt the combined username and password
+    with open("server_public.pem", "r") as f:
+        pub_key = f.read()
+    encrypted_user_credentials = asym_encrypt(user_credentials, pub_key)
+    # Send the encrypted username and password to the server
+    connection.send(encrypted_user_credentials)
+    return username, password
+
+
 def client():
     server_name = str(input("Enter the server IP or name: ")) # switch to ipv4 of another computer on the network to transfer between computers
     server_port = 13000
@@ -73,22 +94,12 @@ def client():
             pub_key = (client_socket.recv(1024).decode())
             f.write(pub_key)
 
-        username = input("Enter the Username: ") # print username prompt and wait for input
-        password = input("Enter the password: ") # receive prompt for password
-        # ---------------------------------------------------------------------------------------------
-        
-        # Combine the username and password into a single string
-        user_credentials = username + " " + password
-        # Encrypt the combined username and password
-        encrypted_user_credentials = asym_encrypt(user_credentials, "server_public.pem")
-        # Send the encrypted username and password to the server
-        client_socket.send(encrypted_user_credentials)
+        username, password = send_user_credentials(client_socket)
 
         # Decrypt the server response (sym_key), encrypt and send OK message
         sym_key = sym_decrypt(client_socket.recv(1024).decode(), username + "_public.pem")
         msg = 'OK'
         client_socket.send(sym_encrypt(msg.encode(), sym_key))
-
 
         # Check if the client received "Invalid username or password.\nTerminating" from the server
         if client_socket.recv(1024).decode() == "Invalid username or password.\nTerminating":
@@ -108,6 +119,7 @@ def client():
             client_socket.send(sym_encrypt(choice.encode(), sym_key)) # send choice to server
 
             if choice == '1':
+                # send email protocol
                 try:
                     receivers = input("Enter destinations (separated by ;): ")
                     title = input("Enter title: ")
@@ -137,12 +149,12 @@ def client():
                 print(sym_decrypt(client_socket.recv(2048).decode(), sym_key))
                 ok_msg = "OK"
                 client_socket.send(sym_encrypt(ok_msg.encode(), sym_key))
-                
+
             elif choice == '3':
                 # Display email contents subprotocol
-                index_choice = input(sym_decrypt(client_socket.recv(64).decode(), sym_key))
-                client_socket.send(sym_encrypt(index_choice.encode(), sym_key))
-                print(sym_decrypt(client_socket.recv(2048).decode(), sym_key))
+                index_choice = input(sym_decrypt(client_socket.recv(64).decode(), sym_key)) # get index of needed email from user
+                client_socket.send(sym_encrypt(index_choice.encode(), sym_key)) # send index
+                print(sym_decrypt(client_socket.recv(2048).decode(), sym_key)) # print the email saved at said index
 
             elif choice == '4':
                 print("The connection is terminated with server")
