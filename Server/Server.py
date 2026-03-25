@@ -291,7 +291,9 @@ def main():
 
             if choice == "1":
                 # create and send email
-                pass
+                message = "Send the email"
+                connection.send(sym_encrypt(message.encode("UTF-8"), sym_key))
+                
             elif choice == "2":
                 # display inbox subprotocol
                 send_inbox(username, connection, sym_key)

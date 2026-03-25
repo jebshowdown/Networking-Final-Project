@@ -106,8 +106,11 @@ def client():
         try:
             choice = str(input()) # get the choice from the user
             client_socket.send(sym_encrypt(choice.encode(), sym_key)) # send choice to server
+            server_response = sym_decrypt(client_socket.recv(1024).decode(), sym_key)
+            print(server_response) # TODO: Remove this line later, it's just for testing
 
             if choice == '1':
+                # sending email subprotocol
                 try:
                     receivers = input("Enter destinations (separated by ;): ")
                     title = input("Enter title: ")
@@ -122,8 +125,7 @@ def client():
                         content = input("Enter message contents: ")
 
                     email_message = build_email_message(username, receivers, title, content) #build email format 
-                    # This should be encrypted first before sending to the server
-                    client_socket.send(email_message.encode()) # sends email to server 
+                    client_socket.send(sym_encrypt(email_message.encode(), sym_key)) # sends email to server 
 
                     print("The message is sent to the server.")
 
