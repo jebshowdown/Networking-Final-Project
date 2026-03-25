@@ -4,7 +4,7 @@ from Crypto.Cipher import PKCS1_OAEP, AES
 from Crypto.Util.Padding import pad, unpad
 import socket
 import sys
-from datetime import date, datetime
+from datetime import datetime
 import os
 import json
 
@@ -159,19 +159,20 @@ def parse_email_info(client: str, connection: socket, sym_key: str) -> None:
             content_len -> str: the length of the content in bytes
             content -> str: the email content
     """
-    email_msg = sym_decrypt(connection.recv(1024).decode("UTF-8"), sym_key)
-    email_parts = email_msg.split("\n")
-    sender = email_parts[0].replace("From: ", "")
+    email_msg = sym_decrypt(connection.recv(1024).decode("UTF-8"), sym_key) # receive email 
+    email_parts = email_msg.split("\n") # split email into a list of parts
+    sender = email_parts[0].replace("From: ", "") # remove labels from parts to only have the contents
     receivers = email_parts[1].replace("To: ", "")
     time = datetime.now()
     title = email_parts[2].replace("Title: ", "")
     content_len = email_parts[3].replace("Content Length: ", "")
-    content = "\n".join(email_parts[5:])
+    content = "\n".join(email_parts[5:]) # join all remaining parts as they are the email content
 
-    add_to_inbox_list(client, sender, time, title) 
+    add_to_inbox_list(client, sender, time, title) # add email info to inbox list
 
-    print(f"An email from {sender} is sent to {receivers} has a content length of {content_len}\n")
-    return sender, receivers, time, title, content_len, content
+    print(f"An email from {sender} is sent to {receivers} has a content length of {content_len}\n") 
+    
+    return sender, receivers, time, title, content_len, content 
 
 def add_to_inbox_list(client, sender, time, title):
     """
@@ -190,16 +191,16 @@ def add_to_inbox_list(client, sender, time, title):
             except json.decoder.JSONDecodeError: # if the JSON is empty, create a new list to populate the file with
                 inbox = {}
     else:
-        inbox = {}
+        inbox = {} # if no json file exits, start by creating a dictionary
 
-    inbox[str(len(inbox)+1)] = {
+    inbox[str(len(inbox)+1)] = { # add current email to the dictionary
         "sender": sender,
         "time": time,
         "title": title
     }
-    
-    with open(db_path, "w") as inbox_file:
-        json.dump(inbox, inbox_file, indent=4)
+
+    with open(db_path, "w") as inbox_file: # create json file if it does not exist, open in write mode
+        json.dump(inbox, inbox_file, indent=4) # add the dictionary to the json file 
 
 
 def construct_email_file(sender, receivers, time, title, content_len, content):
@@ -212,7 +213,7 @@ def construct_email_file(sender, receivers, time, title, content_len, content):
             content -> str: the email content
     Returns: None
     """
-    content = (
+    content = ( # create the email with all relevant info
         "From: " + sender + "\n"
         "To: " + receivers + "\n"
         "Time and Date Received: " + time + "\n"
@@ -224,7 +225,7 @@ def construct_email_file(sender, receivers, time, title, content_len, content):
     
     for client in ";".split(receivers):
         with open(f"{client}/{client}_{title}.txt", "w") as f: # saves file in client directory
-            f.write(content)
+            f.write(content) # write all email content into the file
     
 # ------View Inbox Subprotocol------
 def send_inbox(client:str, connection: socket, sym_key: str) -> None:
@@ -236,13 +237,13 @@ def send_inbox(client:str, connection: socket, sym_key: str) -> None:
     """
     with open(f"{client}/{client}_database.json", "r") as f:
         inbox = json.load(f)
-    inbox_str = "Index  From            DateTime                Title\n" + inbox 
+    inbox_str = "Index  From            DateTime                Title\n" # create inbox header 
 
     for key, value in inbox:
-        inbox_str += f"{0:2}{1:15}{2:36}{3:}\n".format(key, value.get("sender"), value.get("time"), value.get("title"))
-    connection.send(sym_encrypt(inbox_str.encode(), sym_key))
+        inbox_str += f"{0:2}{1:15}{2:36}{3:}\n".format(key, value.get("sender"), value.get("time"), value.get("title")) # add inbox entries incrementally
+    connection.send(sym_encrypt(inbox_str.encode(), sym_key)) # send the whole inbox as a table formatted string
 
-    ok_msg = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key)
+    ok_msg = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key) # receive and print ok message from client
     print(ok_msg)
 
 #------View Email Subprotocol------
@@ -254,20 +255,28 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
     sym_key: string -> the sym key to encrypt email data
     Returns: None
     """
+    email_path = f"{client}/{client}_{title}.txt"
+    db_path = f"{client}/{client}_database.json"
+
     msg = "The server request email index: "
-    connection.send(sym_encrypt(msg.encode("UTF-8"), sym_key))
-    
-    with open(f"{client}/{client}_database.json", "r") as inbox_file:
+    connection.send(sym_encrypt(msg.encode("UTF-8"), sym_key)) # send index request message
+    index = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key) # receive and decrypt the request
+
+    with open(db_path, "r") as inbox_file: # open the inbox 
         inbox = json.load(inbox_file)
 
-    index = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key)
-    email_dict = inbox[str(index)]
-    title = email_dict.get("title")
-
-    with open(f"{client}/{client}_{title}.txt", "r") as f:
-        email = f.read()
+    email_dict = inbox[str(index)] # find the dictionary with given index from inbox
+    title = email_dict.get("title") # get the title to search for specific email from files
+    file_size = os.path.getsize(email_path)
     
-    connection.send(sym_encrypt(email.encode("UTF-8"), sym_key))
+    with open(email_path, "rb") as f: # open file with corresponding title
+        while True: # send all email contents 1 kB at a time
+            email_contents = f.read(1024)
+            if not email_contents:
+                connection.sendall(sym_encrypt(b"<<EOF>>"), sym_key)
+                break
+            connection.sendall(sym_encrypt(email_contents, sym_key)) # send file 1Kb at a time
+
 
 
 def main():

@@ -1,7 +1,6 @@
 # Python ClientZ
 import sys
 import socket 
-import os
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP, AES
 from Crypto.Util.Padding import pad, unpad
@@ -162,7 +161,16 @@ def client():
                 # Display email contents subprotocol
                 index_choice = input(sym_decrypt(client_socket.recv(64).decode(), sym_key)) # get index of needed email from user
                 client_socket.send(sym_encrypt(index_choice.encode(), sym_key)) # send index
-                print(sym_decrypt(client_socket.recv(2048).decode(), sym_key)) # print the email saved at said index
+
+                email_str = ""
+                while True:
+                    data = client_socket.recv(1024)
+                    decrypted = sym_decrypt(data, sym_key)
+
+                    if decrypted == b"<<EOF>>":
+                        break
+                    email_str += decrypted.decode()
+                print(email_str)
 
             elif choice == '4':
                 print("The connection is terminated with server")
