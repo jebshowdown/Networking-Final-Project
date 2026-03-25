@@ -46,7 +46,6 @@ def send_pub_key(connected_socket):
     connected_socket.send(ser_pub_key.encode()) # automatically share public key with client
 
 def load_user_passwords():
-
     """
     Purpose: Loads usernames and passwords 
     Parameters: None
@@ -115,36 +114,38 @@ def receive_client_credentials(connection):
     username, password = decrypted_data.split("\n")
     return username, password
 
-def terminate_connection(connection, username):
-    """
-    Purpose: Terminates the connection with the client 
-    Parameters: connection (socket), username (str)
-    Returns: None
-    """
-    print(f"Terminating connection with {username}.")
-    connection.close()
     
-def test_generate_sym_key():
-    """
-    Purpose: Test the generate_sym_key function
-    Parameters: None
-    Returns: None
-    """
-    sym_key = generate_sym_key()
-    print(sym_key.hex())
-    assert len(sym_key) == 32, f"Expected 32 bytes, got {len(sym_key)}"
-    print("test_generate_sym_key passed successfully!")
-
 def sym_encrypt(data: str, sym_key: bytes) -> bytes:
+    """
+    Purpose: Encrypt data using the symmetric key
+    Parameters: data (bytes), sym_key (bytes)
+    Returns: encrypted data (bytes)
+    """
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
     padded_data = pad(data.encode('utf-8'), AES.block_size) # pads the data
     return cipher_aes.encrypt(padded_data) # encrypts and returns the data in bytes
 
 def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
+    """
+    Purpose: Decrypt data using the symmetric key
+    Parameters: data (bytes), sym_key (bytes)
+    Returns: encrypted data (bytes)
+    """
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
     padded_decrypted = cipher_aes.decrypt(data) # decrypts the data in string
     return unpad(padded_decrypted, AES.block_size).decode('UTF-8') # unpads, decodes, and returns the string
 
+def asym_encrypt(data: bytes, public_key_path: str) -> bytes:
+    """
+    Purpose: Encrypt the symmetric key using RSA encryption
+    Parameters: data (bytes), public_key_path (string)
+    Returns: encrypted data (bytes)
+    """
+    recipient_key = RSA.import_key(open(public_key_path).read()) # imports the public key
+    cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
+    
+    # Encrypt and return raw bytes
+    return cipher_rsa.encrypt(data)
 
 def parse_email_info(client: str, connection: socket, sym_key: str) -> None:
     """
@@ -152,8 +153,9 @@ def parse_email_info(client: str, connection: socket, sym_key: str) -> None:
     Parameters: connection -> socket: the socket connection
                 sym_key -> str: the symmetric key for the server
     Returns: sender -> str: the name of the sending client
-            title -> str: the email title
             receivers -> str: the names of the receiving client(s)
+            time -> str: the time the message was received
+            title -> str: the email title
             content_len -> str: the length of the content in bytes
             content -> str: the email content
     """
@@ -180,14 +182,24 @@ def add_to_inbox_list(client, sender, time, title):
                 title -> the title of sent email
     Returns: None
     """
-    with open(f"{client}_inbox.json", 'r+') as f: # check to see if the json file is already populated
-        try:
-            inbox = json.load(f) # read the contents of the JSON file
-        except json.decoder.JSONDecodeError: # if the JSON is empty, create a new list to populate the file with
-            inbox = []
+    db_path = f"{client}/{client}_inbox.json"
+    if os.path.exists(db_path):
+        with open(db_path, 'r') as inbox_file: # check to see if the json file is already populated
+            try:
+                inbox = json.load(inbox_file) # read the contents of the JSON file
+            except json.decoder.JSONDecodeError: # if the JSON is empty, create a new list to populate the file with
+                inbox = {}
+    else:
+        inbox = {}
 
-        inbox.append("{0:2}{1:8}{2:24}{3:36}{4:}\n".format(str(len(inbox)+1), sender, time, title)) # add entry to inbox list
-        json.dump(inbox,f)
+    inbox[str(len(inbox)+1)] = {
+        "sender": sender,
+        "time": time,
+        "title": title
+    }
+    
+    with open(db_path, "w") as inbox_file:
+        json.dump(inbox, inbox_file, indent=4)
 
 
 def construct_email_file(sender, receivers, time, title, content_len, content):
@@ -223,11 +235,13 @@ def send_inbox(client:str, connection: socket, sym_key: str) -> None:
     Returns: None
     """
     with open(f"{client}/{client}_database.json", "r") as f:
-        inbox = f.read()
-    inbox = " ".join(inbox)
+        inbox = json.load(f)
     inbox_str = "Index  From            DateTime                Title\n" + inbox 
 
+    for key, value in inbox:
+        inbox_str += f"{0:2}{1:15}{2:36}{3:}\n".format(key, value.get("sender"), value.get("time"), value.get("title"))
     connection.send(sym_encrypt(inbox_str.encode(), sym_key))
+
     ok_msg = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key)
     print(ok_msg)
 
@@ -240,34 +254,21 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
     sym_key: string -> the sym key to encrypt email data
     Returns: None
     """
-    with open(f"{client}/{client}_database.json", "r") as f:
-        inbox = f.read()
     msg = "The server request email index: "
     connection.send(sym_encrypt(msg.encode("UTF-8"), sym_key))
+    
+    with open(f"{client}/{client}_database.json", "r") as inbox_file:
+        inbox = json.load(inbox_file)
 
     index = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key)
-    inbox_entry = inbox[index] # index should correspond to index wihtin json list
-    start = inbox_entry.find("Title: ") + 7
-    stop = inbox_entry.find("Content Length: ") - 2  
-    title = inbox_entry[start:stop]
+    email_dict = inbox[str(index)]
+    title = email_dict.get("title")
 
     with open(f"{client}/{client}_{title}.txt", "r") as f:
         email = f.read()
     
     connection.send(sym_encrypt(email.encode("UTF-8"), sym_key))
 
-
-# ---- Asymmetric Encryption (RSA) Helper Function ----
-# Purpose: Encrypt the symmetric key using RSA encryption
-# Input: data (bytes), public_key_path (string)
-# Output: encrypted data (bytes)
-# -----------------------------------------------------
-def asym_encrypt(data: bytes, public_key_path: str) -> bytes:
-    recipient_key = RSA.import_key(open(public_key_path).read()) # imports the public key
-    cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
-    
-    # Encrypt and return raw bytes
-    return cipher_rsa.encrypt(data)
 
 def main():
     connection = server_start()
@@ -294,7 +295,8 @@ def main():
                 # create and send email
                 message = "Send the email"
                 connection.send(sym_encrypt(message.encode("UTF-8"), sym_key))
-                
+                sender, receivers, time, title, content_len, content = parse_email_info(username, connection, sym_key)
+                construct_email_file(sender, title, receivers, content_len, content)
             elif choice == "2":
                 # display inbox subprotocol
                 send_inbox(username, connection, sym_key)
