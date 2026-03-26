@@ -303,9 +303,11 @@ def handle_client(connection):
     Parameters: connection (socket)
     """
     try:
+        username, password = receive_client_credentials(connection)
+
         # need to generate keys and write to files
         send_pub_key(connection) # sends server public key from file
-        recv_pub_key(connection) # receives client public key and saves to file
+        recv_pub_key(connection, username) # receives client public key and saves to file
 
         username, password = receive_client_credentials(connection)
 
