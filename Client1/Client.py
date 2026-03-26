@@ -32,13 +32,12 @@ def build_email_message(sender, receivers, title, content) -> str:
 
     return email_message
 
-# ---- Asymmetric Encryption (RSA) Helper Function ----
-# Purpose: Encrypt the username and password using RSA 
-#          encryption
-# Input: data (string), public_key_path (string)
-# Output: encrypted data (bytes)
-# -----------------------------------------------------
 def asym_encrypt(data: str, public_key_path: str) -> bytes:
+    """
+    Purpose: Encrypt the username and password using RSA encryption
+    Input: data (string), public_key_path (string)
+    Output: encrypted data (bytes)
+    """
     recipient_key = RSA.import_key(open(public_key_path).read()) # imports the public key
     cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
     
@@ -46,23 +45,33 @@ def asym_encrypt(data: str, public_key_path: str) -> bytes:
     return cipher_rsa.encrypt(data.encode())
 
 def asym_decrypt(data: bytes, private_key_path: str) -> str:
+    """
+    Purpose: Decrypt the symmetric key using RSA decryption
+    Input: data (bytes), private_key_path (string)
+    Output: decrypted data (string)
+    """
     recipient_key = RSA.import_key(open(private_key_path).read()) # imports the private key
     cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
     
     # Decrypt and return raw bytes
     return cipher_rsa.decrypt(data).decode()
 
-# ---- Symmetric Encryption (AES-ECB) Helper Function ----
-# Purpose: Encrypt using AES encryption the email message
-# Input: data (string), key (bytes)
-# Output: encrypted data (bytes)
-# --------------------------------------------------------
 def sym_encrypt(data: str, sym_key: bytes) -> bytes:
+    """
+    Purpose: Encrypt data using AES encryption with a symmetric key
+    Input: data (string), key (bytes)
+    Output: encrypted data (bytes)
+    """
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
     padded_data = pad(data.encode(), AES.block_size) # pads the data
     return cipher_aes.encrypt(padded_data) # encrypts and returns the data in bytes
 
 def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
+    """
+    Purpose: Decrypt data using AES decryption with a symmetric key
+    Input: data (bytes), key (bytes)
+    Output: decrypted data (string)
+    """
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
     padded_decrypted = cipher_aes.decrypt(data) # decrypts the data in string
     return unpad(padded_decrypted, AES.block_size).decode() # unpads, decodes, and returns the string
