@@ -44,17 +44,17 @@ def asym_encrypt(data: str, public_key_path: str) -> bytes:
     # Encrypt and return raw bytes
     return cipher_rsa.encrypt(data.encode())
 
-def asym_decrypt(data: bytes, private_key_path: str) -> str:
+def asym_decrypt(data: bytes, private_key_path: str) -> bytes:
     """
     Purpose: Decrypt the symmetric key using RSA decryption
     Input: data (bytes), private_key_path (string)
-    Output: decrypted data (string)
+    Output: decrypted data (bytes)
     """
     recipient_key = RSA.import_key(open(private_key_path).read()) # imports the private key
     cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
     
     # Decrypt and return raw bytes
-    return cipher_rsa.decrypt(data).decode()
+    return cipher_rsa.decrypt(data)
 
 def sym_encrypt(data: str, sym_key: bytes) -> bytes:
     """
@@ -86,6 +86,15 @@ def generate_client_keys(username):
         f.write(key.export_key('PEM'))
     with open(pub_path, "wb") as f:
         f.write(key.publickey().export_key('PEM'))
+
+def send_pub_key(connection, username):
+    """
+    Purpose: Sends the client's public key to the server
+    Parameters: connection (socket), username (str)
+    """
+    with open(f"{username}_public.pem", "r") as f:
+        pub_key = f.read()
+    connection.send(pub_key.encode())
 
 def send_user_credentials(connection):
     """
@@ -122,6 +131,9 @@ def client():
 
         username, password = send_user_credentials(client_socket)
 
+        # Send the client's public key to the server
+        send_pub_key(client_socket, username)
+
         # Receive the server response
         server_response = client_socket.recv(1024)
 
@@ -134,7 +146,7 @@ def client():
         # Otherwise, the response is the encrypted symmetric key (raw bytes, so we don't .decode() it!)
         sym_key = asym_decrypt(server_response, username + "_private.pem")
         msg = 'OK'
-        client_socket.send(sym_encrypt(msg.encode(), sym_key))
+        client_socket.send(sym_encrypt(msg, sym_key))
 
     except socket.error as e:
         print('Error in client socket creation:',e)
@@ -145,7 +157,7 @@ def client():
 
         try:
             choice = str(input()) # get the choice from the user
-            client_socket.send(sym_encrypt(choice.encode(), sym_key)) # send choice to server
+            client_socket.send(sym_encrypt(choice, sym_key)) # send choice to server
             server_response = sym_decrypt(client_socket.recv(1024).decode(), sym_key)
             print(server_response) # TODO: Remove this line later, it's just for testing
 

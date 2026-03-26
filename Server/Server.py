@@ -303,7 +303,7 @@ def handle_client(connection):
     """
     try:
         send_pub_key(connection) # sends server public key from file
-        
+
         username, password = receive_client_credentials(connection)
 
         recv_pub_key(connection, username) # receives client public key and saves to file
