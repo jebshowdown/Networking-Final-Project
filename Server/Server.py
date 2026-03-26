@@ -9,15 +9,16 @@ import os
 import json
 
 
-def server_start() -> socket:
+def server_start() -> socket.socket:
     """
-    Purpose: Starts the server and listens, if a connection is made it returns the connection socket
+    Purpose: Starts the server and listens, returning the server socket
     Parameters: none
-    Returns: socket
+    Returns: server socket
     """
     server_port = 13000
     try:
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # initiate a socket with IPV4
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # allow port reuse quickly after restart
     except socket.error as error:
         print("Error in connection to socket", error)
 
@@ -26,14 +27,9 @@ def server_start() -> socket:
     except socket.error as error:
         print("Socket binding error", error)
 
-    server_socket.listen(1) # start up server
+    server_socket.listen(5) # start up server, listen with a backlog
 
-    try:
-        connected_socket, address = server_socket.accept() # accept a socket connection
-    except socket.error as error:
-        print("An error occured", error)
-
-    return connected_socket # return the connected socket
+    return server_socket # return the server socket
 
 def send_pub_key(connected_socket):
     """
@@ -279,25 +275,26 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
 
 
 
-def main():
-    connection = server_start()
-    send_pub_key(connection)
+def handle_client(connection):
+    """
+    Purpose: Handles a single client connection
+    Parameters: connection (socket)
+    """
+    try:
+        send_pub_key(connection)
 
-    username, password = receive_client_credentials(connection)
+        username, password = receive_client_credentials(connection)
 
-    if client_login_check(username, password):
-        sym_key = get_random_bytes(32) # generate a symmetric key
-        encrypted_sym_key = asym_encrypt(sym_key, username + "_public.pem")  # encrypt the symmetric key using the client's public key
-        send_sym_key(connection, encrypted_sym_key)
-        print_connection_success(username)
-        
-    
-    else:
-        send_invalid_login(connection, username)
-        
-    
-    while True:
-        try:
+        if client_login_check(username, password):
+            sym_key = get_random_bytes(32) # generate a symmetric key
+            encrypted_sym_key = asym_encrypt(sym_key, username + "_public.pem")  # encrypt the symmetric key using the client's public key
+            send_sym_key(connection, encrypted_sym_key)
+            print_connection_success(username)
+        else:
+            send_invalid_login(connection, username)
+            return # exit client handler so child process terminates
+            
+        while True:
             choice = sym_decrypt(connection.recv(1024).decode("UTF-8"), sym_key)
 
             if choice == "1":
@@ -305,7 +302,7 @@ def main():
                 message = "Send the email"
                 connection.send(sym_encrypt(message.encode("UTF-8"), sym_key))
                 sender, receivers, time, title, content_len, content = parse_email_info(username, connection, sym_key)
-                construct_email_file(sender, title, receivers, content_len, content)
+                construct_email_file(sender, receivers, str(time), title, content_len, content)
             elif choice == "2":
                 # display inbox subprotocol
                 send_inbox(username, connection, sym_key)
@@ -316,12 +313,52 @@ def main():
                 # terminate connection subprotocol
                 connection.close()
                 print(f"Terminating connection with {username}")
+                break # Exit the loop so the child process can terminate gracefully
 
-
-        except socket.error as error:
-            print('Error:', error)
+    except socket.error as error:
+        print('Error:', error)
+        try:
             connection.close()
-            sys.exit(1)
+        except:
+            pass
+    finally:
+        sys.exit(0) # IMPORTANT: The child process must exit when done with the client!
+
+
+def main():
+    server_socket = server_start()
+    print("Server is up and listening for connections on port 13000...")
+
+    while True:
+        # Prevent zombie processes: manually reap finished children without blocking
+        try:
+            while True:
+                # WNOHANG prevents waitpid from blocking if no children have finished
+                wpid, status = os.waitpid(-1, os.WNOHANG)
+                if wpid == 0:
+                    break # No more zombie processes to reap
+        except OSError:
+            pass # No child processes exist yet
+
+        try:
+            connection, address = server_socket.accept()
+            print(f"Connection accepted from {address}")
+            
+            pid = os.fork()
+            if pid == 0:
+                # This is the child process
+                server_socket.close() # The child doesn't need the listening socket
+                handle_client(connection) # Handles the client. It calls sys.exit(0) at the end.
+            else:
+                # This is the parent process
+                connection.close() # The parent doesn't need to communicate with this connected client, so close it.
+                
+        except socket.error as error:
+            print('Socket accept error:', error)
+            break
+        except KeyboardInterrupt:
+            print("Shutting down the server.")
+            break
 
 if __name__ == "__main__":
     main()
