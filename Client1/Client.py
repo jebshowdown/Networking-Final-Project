@@ -80,13 +80,12 @@ def generate_client_keys(username):
     """Outputs RSA keys if they don't exist for the given username"""
     priv_path = f"{username}_private.pem"
     pub_path = f"{username}_public.pem"
-    if not os.path.exists(priv_path) or not os.path.exists(pub_path):
-        print(f"Generating client RSA keys for {username}...")
-        key = RSA.generate(2048)
-        with open(priv_path, "wb") as f:
-            f.write(key.export_key('PEM'))
-        with open(pub_path, "wb") as f:
-            f.write(key.publickey().export_key('PEM'))
+    print(f"Generating client RSA keys for {username}...")
+    key = RSA.generate(2048)
+    with open(priv_path, "wb") as f:
+        f.write(key.export_key('PEM'))
+    with open(pub_path, "wb") as f:
+        f.write(key.publickey().export_key('PEM'))
 
 def send_user_credentials(connection):
     """
@@ -123,16 +122,19 @@ def client():
 
         username, password = send_user_credentials(client_socket)
 
-        # Decrypt the server response (sym_key), encrypt and send OK message
-        sym_key = asym_decrypt(client_socket.recv(1024).decode(), username + "_private.pem")
-        msg = 'OK'
-        client_socket.send(sym_encrypt(msg.encode(), sym_key))
+        # Receive the server response
+        server_response = client_socket.recv(1024)
 
-        # Check if the client received "Invalid username or password.\nTerminating" from the server
-        if client_socket.recv(1024).decode() == "Invalid username or password.\nTerminating":
-            print("Invalid username or password.")
+        # Check if the client received an invalid login message from the server
+        if b"Invalid username or password" in server_response:
+            print("Invalid username or password. Terminating.")
             client_socket.close()
             sys.exit(1)
+
+        # Otherwise, the response is the encrypted symmetric key (raw bytes, so we don't .decode() it!)
+        sym_key = asym_decrypt(server_response, username + "_private.pem")
+        msg = 'OK'
+        client_socket.send(sym_encrypt(msg.encode(), sym_key))
 
     except socket.error as e:
         print('Error in client socket creation:',e)
