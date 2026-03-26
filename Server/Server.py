@@ -8,6 +8,17 @@ from datetime import datetime
 import os
 import json
 
+def generate_server_keys():
+    """Outputs RSA keys if they don't exist"""
+    priv_path = "server_private.pem"
+    pub_path = "server_public.pem"
+    if not os.path.exists(priv_path) or not os.path.exists(pub_path):
+        print("Generating server RSA keys...")
+        key = RSA.generate(2048)
+        with open(priv_path, "wb") as f:
+            f.write(key.export_key('PEM'))
+        with open(pub_path, "wb") as f:
+            f.write(key.publickey().export_key('PEM'))
 
 def server_start() -> socket.socket:
     """
@@ -339,6 +350,8 @@ def handle_client(connection):
 
 
 def main():
+    generate_server_keys()
+    
     server_socket = server_start()
     print("Server is up and listening for connections on port 13000...")
 

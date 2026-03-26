@@ -1,4 +1,4 @@
-# Python ClientZ
+import os
 import sys
 import socket 
 from Crypto.PublicKey import RSA
@@ -76,6 +76,18 @@ def sym_decrypt(data: bytes, sym_key: bytes) -> str:
     padded_decrypted = cipher_aes.decrypt(data) # decrypts the data in string
     return unpad(padded_decrypted, AES.block_size).decode() # unpads, decodes, and returns the string
 
+def generate_client_keys(username):
+    """Outputs RSA keys if they don't exist for the given username"""
+    priv_path = f"{username}_private.pem"
+    pub_path = f"{username}_public.pem"
+    if not os.path.exists(priv_path) or not os.path.exists(pub_path):
+        print(f"Generating client RSA keys for {username}...")
+        key = RSA.generate(2048)
+        with open(priv_path, "wb") as f:
+            f.write(key.export_key('PEM'))
+        with open(pub_path, "wb") as f:
+            f.write(key.publickey().export_key('PEM'))
+
 def send_user_credentials(connection):
     """
     Purpose: Prompts user for credentials, encrypts and sends them
@@ -85,6 +97,8 @@ def send_user_credentials(connection):
     """
     username = input("Enter the Username: ") # print username prompt and wait for input
     password = input("Enter the password: ") # receive prompt for password
+    
+    generate_client_keys(username) # ensures keys exist moving forward
     
     # Combine the username and password into a single string
     user_credentials = username + "\n" + password
