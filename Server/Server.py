@@ -23,7 +23,7 @@ def server_start() -> socket.socket:
         print("Error in connection to socket", error)
 
     try:
-        server_socket.bind((" ", server_port)) # bind socket to port
+        server_socket.bind(('', server_port)) # bind socket to port
     except socket.error as error:
         print("Socket binding error", error)
 

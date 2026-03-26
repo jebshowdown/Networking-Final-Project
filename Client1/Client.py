@@ -87,11 +87,9 @@ def send_user_credentials(connection):
     password = input("Enter the password: ") # receive prompt for password
     
     # Combine the username and password into a single string
-    user_credentials = username + " " + password
+    user_credentials = username + "\n" + password
     # Encrypt the combined username and password
-    with open("server_public.pem", "r") as f:
-        pub_key = f.read()
-    encrypted_user_credentials = asym_encrypt(user_credentials, pub_key)
+    encrypted_user_credentials = asym_encrypt(user_credentials, "server_public.pem")
     # Send the encrypted username and password to the server
     connection.send(encrypted_user_credentials)
     return username, password
