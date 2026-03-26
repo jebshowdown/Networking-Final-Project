@@ -318,6 +318,13 @@ def handle_client(connection):
             return # exit client handler so child process terminates
             
         while True:
+            menu = "\nSelect an operation:\n" \
+            "1) Create and send an email\n" \
+            "2) Display the inbox list\n" \
+            "3) Display the email contents\n" \
+            "4) Terminate the connection\n" \
+            "Choice: "
+            connection.send(sym_encrypt(menu, sym_key))
             choice = sym_decrypt(connection.recv(1024).decode("UTF-8"), sym_key)
 
             if choice == "1":
