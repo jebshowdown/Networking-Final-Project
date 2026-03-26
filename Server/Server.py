@@ -41,6 +41,17 @@ def send_pub_key(connected_socket):
         ser_pub_key = f.read()
     connected_socket.send(ser_pub_key.encode()) # automatically share public key with client
 
+def recv_pub_key(connected_socket: socket, client: str):
+    """
+    Purpose: Sends the server's public key as a message to the client
+    Parameters: The connected socket
+    Returns: None
+    """
+    with open(f"{client}_public.pem", "w") as f:
+        pub_key = connected_socket.recv(1024).decode() # automatically share public key with client
+        f.write(pub_key)
+
+
 def load_user_passwords():
     """
     Purpose: Loads usernames and passwords 
@@ -281,7 +292,9 @@ def handle_client(connection):
     Parameters: connection (socket)
     """
     try:
-        send_pub_key(connection)
+        # need to generate keys and write to files
+        send_pub_key(connection) # sends server public key from file
+        recv_pub_key(connection) # receives client public key and saves to file
 
         username, password = receive_client_credentials(connection)
 
