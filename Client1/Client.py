@@ -156,6 +156,8 @@ def client():
     while True:
 
         try:
+            menu = sym_decrypt(client_socket.recv(256), sym_key)
+            print(menu)
             choice = str(input()) # get the choice from the user
             client_socket.send(sym_encrypt(choice, sym_key)) # send choice to server
             server_response = sym_decrypt(client_socket.recv(1024).decode(), sym_key)
