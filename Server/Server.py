@@ -254,7 +254,7 @@ def send_inbox(client:str, connection: socket, sym_key: str) -> None:
     sym_key: string -> the sym key to encrypt email data
     Returns: None
     """
-    with open(f"{client}/{client}_database.json", "r") as f:
+    with open(f"{client}/{client}_inbox.json", "r") as f:
         inbox = json.load(f)
     inbox_str = "Index  From            DateTime                Title\n" # create inbox header 
 
@@ -275,7 +275,7 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
     Returns: None
     """
     email_path = f"{client}/{client}_{title}.txt"
-    db_path = f"{client}/{client}_database.json"
+    db_path = f"{client}/{client}_inbox.json"
 
     msg = "The server request email index: "
     connection.send(sym_encrypt(msg.encode("UTF-8"), sym_key)) # send index request message
