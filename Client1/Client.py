@@ -56,14 +56,16 @@ def asym_decrypt(data: bytes, private_key_path: str) -> bytes:
     # Decrypt and return raw bytes
     return cipher_rsa.decrypt(data)
 
-def sym_encrypt(data: str, sym_key: bytes) -> bytes:
+def sym_encrypt(data, sym_key: bytes) -> bytes:
     """
     Purpose: Encrypt data using AES encryption with a symmetric key
-    Input: data (string), key (bytes)
+    Input: data (string or bytes), key (bytes)
     Output: encrypted data (bytes)
     """
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
-    padded_data = pad(data.encode(), AES.block_size) # pads the data
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    padded_data = pad(data, AES.block_size) # pads the data
     return cipher_aes.encrypt(padded_data) # encrypts and returns the data in bytes
 
 def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
@@ -160,7 +162,8 @@ def client():
             print(menu)
             choice = str(input()) # get the choice from the user
             client_socket.send(sym_encrypt(choice, sym_key)) # send choice to server
-            server_response = sym_decrypt(client_socket.recv(1024).decode(), sym_key)
+            # We receive RAW bytes and decrypt them without decoding them first
+            server_response = sym_decrypt(client_socket.recv(1024), sym_key)
             print(server_response) # TODO: Remove this line later, it's just for testing
 
             if choice == '1':
@@ -190,13 +193,13 @@ def client():
                 
             elif choice == '2':
                 # inbox display subprotocol
-                print(sym_decrypt(client_socket.recv(2048).decode(), sym_key))
+                print(sym_decrypt(client_socket.recv(2048), sym_key))
                 ok_msg = "OK"
                 client_socket.send(sym_encrypt(ok_msg.encode(), sym_key))
 
             elif choice == '3':
                 # Display email contents subprotocol
-                index_choice = input(sym_decrypt(client_socket.recv(64).decode(), sym_key)) # get index of needed email from user
+                index_choice = input(sym_decrypt(client_socket.recv(64), sym_key)) # get index of needed email from user
                 client_socket.send(sym_encrypt(index_choice.encode(), sym_key)) # send index
 
                 email_str = ""

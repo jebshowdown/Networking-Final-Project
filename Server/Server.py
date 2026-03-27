@@ -132,14 +132,16 @@ def receive_client_credentials(connection):
     return username, password
 
     
-def sym_encrypt(data: str, sym_key: bytes) -> bytes:
+def sym_encrypt(data, sym_key: bytes) -> bytes:
     """
     Purpose: Encrypt data using the symmetric key
-    Parameters: data (bytes), sym_key (bytes)
+    Parameters: data (string or bytes), sym_key (bytes)
     Returns: encrypted data (bytes)
     """
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
-    padded_data = pad(data.encode('utf-8'), AES.block_size) # pads the data
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    padded_data = pad(data, AES.block_size) # pads the data
     return cipher_aes.encrypt(padded_data) # encrypts and returns the data in bytes
 
 def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
@@ -176,7 +178,7 @@ def parse_email_info(client: str, connection: socket, sym_key: str) -> None:
             content_len -> str: the length of the content in bytes
             content -> str: the email content
     """
-    email_msg = sym_decrypt(connection.recv(1024).decode("UTF-8"), sym_key) # receive email 
+    email_msg = sym_decrypt(connection.recv(1024), sym_key) # receive email 
     email_parts = email_msg.split("\n") # split email into a list of parts
     sender = email_parts[0].replace("From: ", "") # remove labels from parts to only have the contents
     receivers = email_parts[1].replace("To: ", "")
@@ -260,7 +262,7 @@ def send_inbox(client:str, connection: socket, sym_key: str) -> None:
         inbox_str += f"{0:2}{1:15}{2:36}{3:}\n".format(key, value.get("sender"), value.get("time"), value.get("title")) # add inbox entries incrementally
     connection.send(sym_encrypt(inbox_str.encode(), sym_key)) # send the whole inbox as a table formatted string
 
-    ok_msg = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key) # receive and print ok message from client
+    ok_msg = sym_decrypt(connection.recv(16), sym_key) # receive and print ok message from client
     print(ok_msg)
 
 #------View Email Subprotocol------
@@ -277,7 +279,7 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
 
     msg = "The server request email index: "
     connection.send(sym_encrypt(msg.encode("UTF-8"), sym_key)) # send index request message
-    index = sym_decrypt(connection.recv(16).decode("UTF-8"), sym_key) # receive and decrypt the request
+    index = sym_decrypt(connection.recv(16), sym_key) # receive and decrypt the request
 
     with open(db_path, "r") as inbox_file: # open the inbox 
         inbox = json.load(inbox_file)
@@ -290,7 +292,7 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
         while True: # send all email contents 1 kB at a time
             email_contents = f.read(1024)
             if not email_contents:
-                connection.sendall(sym_encrypt(b"<<EOF>>"), sym_key)
+                connection.sendall(sym_encrypt(b"<<EOF>>", sym_key))
                 break
             connection.sendall(sym_encrypt(email_contents, sym_key)) # send file 1Kb at a time
 
@@ -325,7 +327,7 @@ def handle_client(connection):
             "4) Terminate the connection\n" \
             "Choice: "
             connection.send(sym_encrypt(menu, sym_key))
-            choice = sym_decrypt(connection.recv(1024).decode("UTF-8"), sym_key)
+            choice = sym_decrypt(connection.recv(1024), sym_key)
 
             if choice == "1":
                 # create and send email
