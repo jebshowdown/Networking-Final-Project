@@ -245,6 +245,7 @@ def construct_email_file(sender, receivers, time, title, content_len, content):
     for client in ";".split(receivers):
         with open(f"{client}/{client}_{title}.txt", "w") as f: # saves file in client directory
             f.write(content) # write all email content into the file
+        add_to_inbox_list(client, sender, time, title)
     
 # ------View Inbox Subprotocol------
 def send_inbox(client:str, connection: socket, sym_key: str) -> None:
@@ -331,8 +332,6 @@ def handle_client(connection):
 
             if choice == "1":
                 # create and send email
-                message = "Send the email"
-                connection.send(sym_encrypt(message.encode("UTF-8"), sym_key))
                 sender, receivers, time, title, content_len, content = parse_email_info(username, connection, sym_key)
                 construct_email_file(sender, receivers, str(time), title, content_len, content)
             elif choice == "2":
