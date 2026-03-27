@@ -233,7 +233,7 @@ def construct_email_file(sender, receivers, time, title, content_len, content):
             content -> str: the email content
     Returns: None
     """
-    content = ( # create the email with all relevant info
+    message = ( # create the email with all relevant info
         "From: " + sender + "\n"
         "To: " + receivers + "\n"
         "Time and Date Received: " + time + "\n"
@@ -247,7 +247,7 @@ def construct_email_file(sender, receivers, time, title, content_len, content):
         client = client.strip() # Strip whitespaces
         os.makedirs(client, exist_ok=True) # Ensure receiving client directory exists
         with open(f"{client}/{client}_{title}.txt", "w") as f: # saves file in client directory
-            f.write(content) # write all email content into the file
+            f.write(message) # write all email content into the file
         add_to_inbox_list(client, sender, time, title)
     
 # ------View Inbox Subprotocol------
