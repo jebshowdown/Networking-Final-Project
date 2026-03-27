@@ -182,7 +182,7 @@ def parse_email_info(client: str, connection: socket, sym_key: str) -> None:
     email_parts = email_msg.split("\n") # split email into a list of parts
     sender = email_parts[0].replace("From: ", "") # remove labels from parts to only have the contents
     receivers = email_parts[1].replace("To: ", "")
-    time = datetime.now()
+    time = str(datetime.now())
     title = email_parts[2].replace("Title: ", "")
     content_len = email_parts[3].replace("Content Length: ", "")
     content = "\n".join(email_parts[5:]) # join all remaining parts as they are the email content
@@ -203,6 +203,7 @@ def add_to_inbox_list(client, sender, time, title):
     Returns: None
     """
     db_path = f"{client}/{client}_inbox.json"
+    os.makedirs(client, exist_ok=True) # Ensure the client directory exists
     if os.path.exists(db_path):
         with open(db_path, 'r') as inbox_file: # check to see if the json file is already populated
             try:
@@ -242,7 +243,9 @@ def construct_email_file(sender, receivers, time, title, content_len, content):
         + content
     )
     
-    for client in ";".split(receivers):
+    for client in receivers.split(";"):
+        client = client.strip() # Strip whitespaces
+        os.makedirs(client, exist_ok=True) # Ensure receiving client directory exists
         with open(f"{client}/{client}_{title}.txt", "w") as f: # saves file in client directory
             f.write(content) # write all email content into the file
         add_to_inbox_list(client, sender, time, title)
