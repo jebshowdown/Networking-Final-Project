@@ -273,9 +273,7 @@ def send_inbox(client:str, connection: socket, sym_key: str) -> None:
         inbox_str += f"{key:7}{value.get('sender'):16}{value.get('time'):32}{value.get('title')}\n" # add inbox entries incrementally
     connection.send(sym_encrypt(inbox_str.encode(), sym_key)) # send the whole inbox as a table formatted string
 
-    ok_msg = sym_decrypt(connection.recv(16), sym_key) # receive and print ok message from client
-    print(ok_msg)
-
+    sym_decrypt(connection.recv(16), sym_key) # wait for client to finish processing
 #------View Email Subprotocol------
 def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
     """
@@ -313,6 +311,8 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
                 connection.sendall(sym_encrypt(email_contents, sym_key)) # send file 1Kb at a time
     else:
         connection.sendall(sym_encrypt(b"Email not found!<<EOF>>", sym_key))
+    
+    sym_decrypt(connection.recv(16), sym_key) # wait for client to finish processing
 
 
 

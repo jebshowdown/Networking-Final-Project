@@ -147,8 +147,7 @@ def client():
 
         # Otherwise, the response is the encrypted symmetric key (raw bytes, so we don't .decode() it!)
         sym_key = asym_decrypt(server_response, username + "_private.pem")
-        msg = 'OK'
-        client_socket.send(sym_encrypt(msg, sym_key))
+
 
     except socket.error as e:
         print('Error in client socket creation:',e)
@@ -160,11 +159,8 @@ def client():
         try:
             menu = sym_decrypt(client_socket.recv(256), sym_key)
             print(menu)
-            choice = str(input()) # get the choice from the user
+            choice = input().strip() # get the choice from the user
             client_socket.send(sym_encrypt(choice, sym_key)) # send choice to server
-            # We receive RAW bytes and decrypt them without decoding them first
-            server_response = sym_decrypt(client_socket.recv(1024), sym_key)
-            print(server_response) # TODO: Remove this line later, it's just for testing
 
             if choice == '1':
                 # send email protocol
@@ -198,8 +194,12 @@ def client():
                 client_socket.send(sym_encrypt(ok_msg.encode(), sym_key))
 
             elif choice == '3':
-                # Display email contents subprotocol
-                index_choice = input(sym_decrypt(client_socket.recv(64), sym_key)) # get index of needed email from user
+                prompt_msg = sym_decrypt(client_socket.recv(1024), sym_key)
+                print(prompt_msg)
+                index_choice = input().strip() # get index of needed email from user
+                if not index_choice:
+                    index_choice = "0"
+
                 client_socket.send(sym_encrypt(index_choice.encode(), sym_key)) # send index
 
                 email_str = ""
@@ -207,10 +207,12 @@ def client():
                     data = client_socket.recv(1024)
                     decrypted = sym_decrypt(data, sym_key)
 
-                    if decrypted == b"<<EOF>>":
+                    if "<<EOF>>" in decrypted:
+                        email_str += decrypted.replace("<<EOF>>", "")
                         break
-                    email_str += decrypted.decode()
+                    email_str += decrypted
                 print(email_str)
+                client_socket.send(sym_encrypt(b"OK", sym_key))
 
             elif choice == '4':
                 print("The connection is terminated with server")
