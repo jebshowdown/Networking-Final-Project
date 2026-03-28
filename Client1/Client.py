@@ -207,9 +207,10 @@ def client():
                     data = client_socket.recv(1024)
                     decrypted = sym_decrypt(data, sym_key)
 
-                    if decrypted == b"<<EOF>>":
+                    if "<<EOF>>" in decrypted:
+                        email_str += decrypted.replace("<<EOF>>", "")
                         break
-                    email_str += decrypted.decode()
+                    email_str += decrypted
                 print(email_str)
 
             elif choice == '4':

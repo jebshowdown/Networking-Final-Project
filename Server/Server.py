@@ -187,7 +187,7 @@ def parse_email_info(client: str, connection: socket, sym_key: str) -> None:
     content_len = email_parts[3].replace("Content Length: ", "")
     content = "\n".join(email_parts[5:]) # join all remaining parts as they are the email content
 
-    add_to_inbox_list(client, sender, time, title) # add email info to inbox list
+
 
     print(f"An email from {sender} is sent to {receivers} has a content length of {content_len}\n") 
     
@@ -258,12 +258,19 @@ def send_inbox(client:str, connection: socket, sym_key: str) -> None:
     sym_key: string -> the sym key to encrypt email data
     Returns: None
     """
-    with open(f"{client}/{client}_inbox.json", "r") as f:
-        inbox = json.load(f)
-    inbox_str = "Index  From            DateTime                Title\n" # create inbox header 
+    db_path = f"{client}/{client}_inbox.json"
+    inbox = {}
+    if os.path.exists(db_path):
+        with open(db_path, "r") as f:
+            try:
+                inbox = json.load(f)
+            except Exception:
+                pass
 
-    for key, value in inbox:
-        inbox_str += f"{0:2}{1:15}{2:36}{3:}\n".format(key, value.get("sender"), value.get("time"), value.get("title")) # add inbox entries incrementally
+    inbox_str = "Index  From            DateTime                        Title\n" # create inbox header 
+
+    for key, value in inbox.items():
+        inbox_str += f"{key:7}{value.get('sender'):16}{value.get('time'):32}{value.get('title')}\n" # add inbox entries incrementally
     connection.send(sym_encrypt(inbox_str.encode(), sym_key)) # send the whole inbox as a table formatted string
 
     ok_msg = sym_decrypt(connection.recv(16), sym_key) # receive and print ok message from client
@@ -278,27 +285,34 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
     sym_key: string -> the sym key to encrypt email data
     Returns: None
     """
-    email_path = f"{client}/{client}_{title}.txt"
     db_path = f"{client}/{client}_inbox.json"
 
     msg = "The server request email index: "
     connection.send(sym_encrypt(msg.encode("UTF-8"), sym_key)) # send index request message
     index = sym_decrypt(connection.recv(16), sym_key) # receive and decrypt the request
 
-    with open(db_path, "r") as inbox_file: # open the inbox 
-        inbox = json.load(inbox_file)
+    inbox = {}
+    if os.path.exists(db_path):
+        with open(db_path, "r") as inbox_file: # open the inbox 
+            try:
+                inbox = json.load(inbox_file)
+            except Exception:
+                pass
 
-    email_dict = inbox[str(index)] # find the dictionary with given index from inbox
+    email_dict = inbox.get(str(index), {}) # find the dictionary with given index from inbox
     title = email_dict.get("title") # get the title to search for specific email from files
-    file_size = os.path.getsize(email_path)
-    
-    with open(email_path, "rb") as f: # open file with corresponding title
-        while True: # send all email contents 1 kB at a time
-            email_contents = f.read(1024)
-            if not email_contents:
-                connection.sendall(sym_encrypt(b"<<EOF>>", sym_key))
-                break
-            connection.sendall(sym_encrypt(email_contents, sym_key)) # send file 1Kb at a time
+    email_path = f"{client}/{client}_{title}.txt" if title else ""
+    if os.path.exists(email_path):
+        file_size = os.path.getsize(email_path)
+        with open(email_path, "rb") as f: # open file with corresponding title
+            while True: # send all email contents 1 kB at a time
+                email_contents = f.read(1024)
+                if not email_contents:
+                    connection.sendall(sym_encrypt(b"<<EOF>>", sym_key))
+                    break
+                connection.sendall(sym_encrypt(email_contents, sym_key)) # send file 1Kb at a time
+    else:
+        connection.sendall(sym_encrypt(b"Email not found!<<EOF>>", sym_key))
 
 
 
