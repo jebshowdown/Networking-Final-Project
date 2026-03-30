@@ -6,6 +6,13 @@ from Crypto.Cipher import PKCS1_OAEP, AES
 from Crypto.Util.Padding import pad, unpad
 
 def validate_email_fields(title, content):
+    """
+    Purpose: Checks that the email is within the requisite length
+    Parameters: title:str -> the title of the email
+    content:str -> the content of the email
+    Returns: None
+    """
+
     # Title must be 100 chars or less
     if len(title) > 100:
         raise ValueError("Title is too long. Maximum is 100 characters.")
@@ -16,7 +23,15 @@ def validate_email_fields(title, content):
 
 
 def build_email_message(sender, receivers, title, content) -> str:
-   
+    """
+    Purpose: Builds an email message with the required fields
+    Parameters: sender:str -> the sender of the email
+    receivers:str -> the receivers of the email, separated by ";"
+    title:str -> the title of the email
+    content:str -> the content of the email
+    Returns: email_message:str -> the email message
+    """
+
     validate_email_fields(title, content)  # check that title and content follow the rules
     content_length = len(content) # counts how many characters are in the content
 
@@ -32,11 +47,13 @@ def build_email_message(sender, receivers, title, content) -> str:
 
     return email_message
 
+
 def asym_encrypt(data: str, public_key_path: str) -> bytes:
     """
     Purpose: Encrypt the username and password using RSA encryption
-    Input: data (string), public_key_path (string)
-    Output: encrypted data (bytes)
+    Input: data:str -> the data to be encrypted
+    public_key_path:str -> the path of the public key
+    Output: encrypted data:bytes
     """
     recipient_key = RSA.import_key(open(public_key_path).read()) # imports the public key
     cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
@@ -44,11 +61,13 @@ def asym_encrypt(data: str, public_key_path: str) -> bytes:
     # Encrypt and return raw bytes
     return cipher_rsa.encrypt(data.encode())
 
+
 def asym_decrypt(data: bytes, private_key_path: str) -> bytes:
     """
     Purpose: Decrypt the symmetric key using RSA decryption
-    Input: data (bytes), private_key_path (string)
-    Output: decrypted data (bytes)
+    Input: data:bytes -> the data to be decrypted
+    private_key_path:str -> the path of the private key
+    Output: decrypted data:bytes
     """
     recipient_key = RSA.import_key(open(private_key_path).read()) # imports the private key
     cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
@@ -56,11 +75,13 @@ def asym_decrypt(data: bytes, private_key_path: str) -> bytes:
     # Decrypt and return raw bytes
     return cipher_rsa.decrypt(data)
 
+
 def sym_encrypt(data, sym_key: bytes) -> bytes:
     """
     Purpose: Encrypt data using AES encryption with a symmetric key
-    Input: data (string or bytes), key (bytes)
-    Output: encrypted data (bytes)
+    Input: data:string/bytes -> the data to be encrypted
+    sym_key:bytes -> the sym key for encryption
+    Output: encrypted data:bytes
     """
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
     if isinstance(data, str):
@@ -68,20 +89,24 @@ def sym_encrypt(data, sym_key: bytes) -> bytes:
     padded_data = pad(data, AES.block_size) # pads the data
     return cipher_aes.encrypt(padded_data) # encrypts and returns the data in bytes
 
+
 def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
     """
-    Purpose: Decrypt data using AES decryption with a symmetric key
-    Input: data (bytes), key (bytes)
-    Output: decrypted data (string)
+    Purpose: Decrypt using the sym key 
+    Input: data:bytes -> the data to be decrypted
+    sym_key:str -> the symmetric key
+    Output: decrypted data:bytes
     """
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
     padded_decrypted = cipher_aes.decrypt(data) # decrypts the data in string
     return unpad(padded_decrypted, AES.block_size).decode() # unpads, decodes, and returns the string
 
+
 def send_pub_key(connection, username):
     """
     Purpose: Sends the client's public key to the server
-    Parameters: connection (socket), username (str)
+    Parameters: connection:socket
+    username:str -> client username
     """
     with open(f"{username}_public.pem", "r") as f:
         pub_key = f.read()
@@ -90,9 +115,9 @@ def send_pub_key(connection, username):
 def send_user_credentials(connection):
     """
     Purpose: Prompts user for credentials, encrypts and sends them
-    Parameters: connection -> socket: the client connection socket
-    Returns: Username -> str: the client's username
-             Password -> str: the client's password
+    Parameters: connection:socket -> the client connection socket
+    Returns: Username:str -> the client's username
+             Password:str -> the client's password
     """
     username = input("Enter the Username: ") # print username prompt and wait for input
     password = input("Enter the password: ") # receive prompt for password
@@ -212,18 +237,3 @@ def client():
             sys.exit(1)
 
 client()
-
-
-# # Test for building email
-# try:
-#     test_email = build_email_message(
-#         "client1",
-#         "client2;client3",
-#         "TestwefweFWEfgw    EG  EwRGWfgesfWSEFwsefWEFwegwer qhhtqwrehwrthgwrtghwrstgrstghwrtstghwsrthwrtsfhrgfhwtrhjgergetrghwerth",
-#         "Hello team"
-#     )
-
-#     print(test_email)
-
-# except ValueError as e:
-#     print("Email error:", e)

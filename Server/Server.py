@@ -31,6 +31,7 @@ def server_start() -> socket.socket:
 
     return server_socket # return the server socket
 
+
 def send_pub_key(connected_socket):
     """
     Purpose: Sends the server's public key as a message to the client
@@ -41,9 +42,10 @@ def send_pub_key(connected_socket):
         ser_pub_key = f.read()
     connected_socket.send(ser_pub_key.encode()) # automatically share public key with client
 
+
 def recv_pub_key(connected_socket: socket, client: str):
     """
-    Purpose: Sends the server's public key as a message to the client
+    Purpose: receives the clien's public key and writes it into a file
     Parameters: The connected socket
     Returns: None
     """
@@ -52,37 +54,22 @@ def recv_pub_key(connected_socket: socket, client: str):
         f.write(pub_key)
 
 
-def load_user_passwords():
-    """
-    Purpose: Loads usernames and passwords 
-    Parameters: None
-    Returns: dictionary of usernames and passwords
-    """
-    with open("user_pass.json", "r") as f:
-        user_data = json.load(f)
-
-    return user_data
-
 def client_login_check(username, password):
     """
     Purpose: Checks if the client's username and password match 
-    Parameters: username (str), password (str)
+    Parameters: username:str
+    password:str
     Returns: True if login is correct, otherwise False
     """
-    user_data = load_user_passwords()
+    with open("user_pass.json", "r") as f:
+        user_data = json.load(f)
 
     if username in user_data and user_data[username] == password:
         return True
 
     return False
 
-def send_sym_key(connection, encrypted_sym_key):
-    """
-    Purpose: Sends the encrypted symmetric key to the client
-    Parameters: connection (socket), encrypted_sym_key (bytes)
-    Returns: None
-    """
-    connection.send(encrypted_sym_key)
+
 
 def print_connection_success(username):
     """
@@ -94,21 +81,23 @@ def print_connection_success(username):
 
 def send_invalid_login(connection, username):
     """
-    Purpose: it sends the invalid login message to the client, prints the required
+    Purpose: sends the invalid login message to the client, prints the required
              server message, and closes the connection
-    Parameters: connection (socket), username (str)
+    Parameters: connection:socket
+    username:str
     Returns: None
     """
     connection.send("Invalid username or password".encode("utf-8"))
     print(f"The received client information: {username} is invalid (Connection Terminated).")
     connection.close()
 
+
 def receive_client_credentials(connection):
     """
     Purpose: Receives the encrypted username and password from the client,
              decrypts them using the server private key, and returns both
-    Parameters: connection (socket)
-    Returns: username (str), password (str)
+    Parameters: connection:socket
+    Returns: username:str, password:str
     """
     encrypted_data = connection.recv(1024)
 
@@ -125,8 +114,9 @@ def receive_client_credentials(connection):
 def sym_encrypt(data, sym_key: bytes) -> bytes:
     """
     Purpose: Encrypt data using the symmetric key
-    Parameters: data (string or bytes), sym_key (bytes)
-    Returns: encrypted data (bytes)
+    Parameters: data:str/bytes -> data to be encrypted
+    sym_key:bytes -> symmetric key to encrypt data
+    Returns: encrypted data;bytes
     """
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
     if isinstance(data, str):
@@ -134,21 +124,25 @@ def sym_encrypt(data, sym_key: bytes) -> bytes:
     padded_data = pad(data, AES.block_size) # pads the data
     return cipher_aes.encrypt(padded_data) # encrypts and returns the data in bytes
 
+
 def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
     """
     Purpose: Decrypt data using the symmetric key
-    Parameters: data (bytes), sym_key (bytes)
-    Returns: encrypted data (bytes)
+    Parameters: data:bytes -> the data to be decrypted
+    sym_key:bytes -> the encryption symmetric key
+    Returns: encrypted data:bytes -> data decrypted with the aes cipher
     """
     cipher_aes = AES.new(sym_key, AES.MODE_ECB) # creates a new AES cipher
     padded_decrypted = cipher_aes.decrypt(data) # decrypts the data in string
     return unpad(padded_decrypted, AES.block_size).decode('UTF-8') # unpads, decodes, and returns the string
 
+
 def asym_encrypt(data: bytes, public_key_path: str) -> bytes:
     """
     Purpose: Encrypt the symmetric key using RSA encryption
-    Parameters: data (bytes), public_key_path (string)
-    Returns: encrypted data (bytes)
+    Parameters: data:bytes
+    public_key_path:str -> path to the public key
+    Returns: encrypted data:bytes -> the data encrypted with the rsa cipher
     """
     recipient_key = RSA.import_key(open(public_key_path).read()) # imports the public key
     cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
@@ -156,17 +150,17 @@ def asym_encrypt(data: bytes, public_key_path: str) -> bytes:
     # Encrypt and return raw bytes
     return cipher_rsa.encrypt(data)
 
-def parse_email_info(client: str, connection: socket, sym_key: str) -> None:
+def parse_email_info(connection: socket, sym_key: str) -> None:
     """
     Purpose: parses email info when an email is received by server
-    Parameters: connection -> socket: the socket connection
-                sym_key -> str: the symmetric key for the server
-    Returns: sender -> str: the name of the sending client
-            receivers -> str: the names of the receiving client(s)
-            time -> str: the time the message was received
-            title -> str: the email title
-            content_len -> str: the length of the content in bytes
-            content -> str: the email content
+    Parameters: connection:socket -> the socket connection
+                sym_key:str -> the symmetric key for the server
+    Returns: sender:str -> the name of the sending client
+            receivers:str -> the names of the receiving client(s)
+            time:str -> the time the message was received
+            title:str -> the email title
+            content_len:str -> the length of the content in bytes
+            content:str -> the email content
     """
     email_msg = sym_decrypt(connection.recv(1024), sym_key) # receive email 
     email_parts = email_msg.split("\n") # split email into a list of parts
@@ -183,13 +177,14 @@ def parse_email_info(client: str, connection: socket, sym_key: str) -> None:
     
     return sender, receivers, time, title, content_len, content 
 
+
 def add_to_inbox_list(client, sender, time, title):
     """
     Purpose: Adds entry to the inbox json database
-    Parameters: client -> str: the current client
-                sender -> str: the name of the sender
-                time -> str: the time of sending
-                title -> the title of sent email
+    Parameters: client:str -> the current client
+                sender:str -> the name of the sender
+                time:str -> the time of sending
+                title:str -> the title of sent email
     Returns: None
     """
     db_path = f"{client}/{client}_inbox.json"
@@ -216,11 +211,11 @@ def add_to_inbox_list(client, sender, time, title):
 def construct_email_file(sender, receivers, time, title, content_len, content):
     """
     Purpose: Creates and saves email record to text file
-    Parameters: sender -> str: the name of the sending client
-            title -> str: the email title
-            receivers -> str: the names of the receiving client(s)
-            content_len -> str: the length of the content in bytes
-            content -> str: the email content
+    Parameters: sender:str -> the name of the sending client
+            title:str -> the email title
+            receivers:str -> the names of the receiving client(s)
+            content_len:str -> the length of the content in bytes
+            content:str -> he email content
     Returns: None
     """
     message = ( # create the email with all relevant info
@@ -240,12 +235,13 @@ def construct_email_file(sender, receivers, time, title, content_len, content):
             f.write(message) # write all email content into the file
         add_to_inbox_list(client, sender, time, title)
     
+    
 # ------View Inbox Subprotocol------
 def send_inbox(client:str, connection: socket, sym_key: str) -> None:
     """
     Purpose: Creates a string representing the inbox, encrypts it, and sends to client
-    Parameters: connection -> socket: the client connection socket
-    sym_key: string -> the sym key to encrypt email data
+    Parameters: connection:socket -> the client connection socket
+    sym_key:str -> the sym key to encrypt email data
     Returns: None
     """
     db_path = f"{client}/{client}_inbox.json"
@@ -264,13 +260,15 @@ def send_inbox(client:str, connection: socket, sym_key: str) -> None:
     connection.send(sym_encrypt(inbox_str.encode(), sym_key)) # send the whole inbox as a table formatted string
 
     sym_decrypt(connection.recv(16), sym_key) # wait for client to finish processing
+
+
 #------View Email Subprotocol------
 def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
     """
     Purpose: Finds an email in file, encrypts it, and sends to client
-    Parameters: client -> str: the current client user
-    connection -> socket: the client connection socket
-    sym_key: string -> the sym key to encrypt email data
+    Parameters:str ->  the current client user
+    connection:socket -> the client connection socket
+    sym_key:str -> the sym key to encrypt email data
     Returns: None
     """
     db_path = f"{client}/{client}_inbox.json"
@@ -306,10 +304,11 @@ def send_email_by_index(client: str, connection: socket, sym_key: str) -> None:
 
 
 
-def handle_client(connection):
+def handle_client(connection: socket):
     """
     Purpose: Handles a single client connection
-    Parameters: connection (socket)
+    Parameters: connection:socket
+    Returns: None
     """
     try:
         send_pub_key(connection) # sends server public key from file
@@ -321,8 +320,8 @@ def handle_client(connection):
         if client_login_check(username, password):
             sym_key = get_random_bytes(32) # generate a symmetric key
             encrypted_sym_key = asym_encrypt(sym_key, username + "_public.pem")  # encrypt the symmetric key using the client's public key
-            send_sym_key(connection, encrypted_sym_key)
-            print_connection_success(username)
+            connection.send(encrypted_sym_key)
+            print("Connection Accepted for " + username)
         else:
             send_invalid_login(connection, username)
             return # exit client handler so child process terminates
@@ -339,7 +338,7 @@ def handle_client(connection):
 
             if choice == "1":
                 # create and send email
-                sender, receivers, time, title, content_len, content = parse_email_info(username, connection, sym_key)
+                sender, receivers, time, title, content_len, content = parse_email_info(connection, sym_key)
                 construct_email_file(sender, receivers, str(time), title, content_len, content)
             elif choice == "2":
                 # display inbox subprotocol
