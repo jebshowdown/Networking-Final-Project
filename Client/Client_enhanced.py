@@ -1,0 +1,240 @@
+import os
+import sys
+import socket 
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP, AES
+from Crypto.Util.Padding import pad, unpad
+
+def validate_email_fields(title, content):
+    """
+    Purpose: Checks that the email is within the requisite length
+    Parameters: title:str -> the title of the email
+    content:str -> the content of the email
+    Returns: None
+    """
+
+    # Title must be 100 chars or less
+    if len(title) > 100:
+        raise ValueError("Title is too long. Maximum is 100 characters.")
+
+    # Content cannot be longer than 1000000 characters
+    if len(content) > 1000000:
+        raise ValueError("Content is too long. Maximum is 1000000 characters.")
+
+
+def build_email_message(sender, receivers, title, content) -> str:
+    """
+    Purpose: Builds an email message with the required fields
+    Parameters: sender:str -> the sender of the email
+    receivers:str -> the receivers of the email, separated by ";"
+    title:str -> the title of the email
+    content:str -> the content of the email
+    Returns: email_message:str -> the email message
+    """
+
+    validate_email_fields(title, content)  # check that title and content follow the rules
+    content_length = len(content) # counts how many characters are in the content
+
+    # builds email format
+    email_message = (
+        "From: " + sender + "\n"
+        "To: " + receivers + "\n"
+        "Title: " + title + "\n"
+        "Content Length: " + str(content_length) + "\n"
+        "Content: \n"
+        + content
+    )
+
+    return email_message
+
+
+def asym_encrypt(data: str, public_key_path: str) -> bytes:
+    """
+    Purpose: Encrypt the username and password using RSA encryption
+    Input: data:str -> the data to be encrypted
+    public_key_path:str -> the path of the public key
+    Output: encrypted data:bytes
+    """
+    recipient_key = RSA.import_key(open(public_key_path).read()) # imports the public key
+    cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
+    
+    # Encrypt and return raw bytes
+    return cipher_rsa.encrypt(data.encode())
+
+
+def asym_decrypt(data: bytes, private_key_path: str) -> bytes:
+    """
+    Purpose: Decrypt the symmetric key using RSA decryption
+    Input: data:bytes -> the data to be decrypted
+    private_key_path:str -> the path of the private key
+    Output: decrypted data:bytes
+    """
+    recipient_key = RSA.import_key(open(private_key_path).read()) # imports the private key
+    cipher_rsa = PKCS1_OAEP.new(recipient_key) # creates a new RSA cipher
+    
+    # Decrypt and return raw bytes
+    return cipher_rsa.decrypt(data)
+
+
+def sym_encrypt(data, sym_key: bytes) -> bytes:
+    """
+    Purpose: Encrypt data using AES encryption with a symmetric key
+    Input: data:string/bytes -> the data to be encrypted
+    sym_key:bytes -> the sym key for encryption
+    Output: encrypted data:bytes
+    """
+    cipher_aes = AES.new(sym_key, AES.MODE_CBC) # creates a new AES cipher
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    padded_data = pad(data, AES.block_size) # pads the data
+    ciphertext = cipher_aes.encrypt(padded_data) # encrypts and returns the data in bytes
+    return cipher_aes.iv + ciphertext
+
+
+def sym_decrypt(data: bytes, sym_key: bytes) -> str: 
+    """
+    Purpose: Decrypt using the sym key 
+    Input: data:bytes -> the data to be decrypted
+    sym_key:str -> the symmetric key
+    Output: decrypted data:bytes
+    """
+    iv = data[:AES.block_size] # extracts the iv from the data
+    ciphertext = data[AES.block_size:] # extracts the ciphertext from the data
+    cipher_aes = AES.new(sym_key, AES.MODE_CBC, iv) # creates a new AES cipher
+    padded_decrypted = cipher_aes.decrypt(ciphertext) # decrypts the data in string
+    return unpad(padded_decrypted, AES.block_size).decode() # unpads, decodes, and returns the string
+
+
+def send_pub_key(connection, username):
+    """
+    Purpose: Sends the client's public key to the server
+    Parameters: connection:socket
+    username:str -> client username
+    """
+    with open(f"{username}_public.pem", "r") as f:
+        pub_key = f.read()
+    connection.send(pub_key.encode())
+
+def send_user_credentials(connection):
+    """
+    Purpose: Prompts user for credentials, encrypts and sends them
+    Parameters: connection:socket -> the client connection socket
+    Returns: Username:str -> the client's username
+             Password:str -> the client's password
+    """
+    username = input("Enter the Username: ") # print username prompt and wait for input
+    password = input("Enter the password: ") # receive prompt for password
+    
+    
+    # Combine the username and password into a single string
+    user_credentials = username + "\n" + password
+    # Encrypt the combined username and password
+    encrypted_user_credentials = asym_encrypt(user_credentials, "server_public.pem")
+    # Send the encrypted username and password to the server
+    connection.send(encrypted_user_credentials)
+    return username, password
+
+
+def client():
+    server_name = str(input("Enter the server IP or name: ")) # switch to ipv4 of another computer on the network to transfer between computers
+    server_port = 13000
+    
+    try:
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # create a socket
+        client_socket.connect((server_name,server_port)) # connect to the server
+        
+        with open("server_public.pem", "w") as f:
+            pub_key = (client_socket.recv(1024).decode())
+            f.write(pub_key)
+
+        username, password = send_user_credentials(client_socket)
+
+        # Send the client's public key to the server
+        send_pub_key(client_socket, username)
+
+        # Receive the server response
+        server_response = client_socket.recv(1024)
+
+        # Check if the client received an invalid login message from the server
+        if b"Invalid username or password" in server_response:
+            print("Invalid username or password. Terminating.")
+            client_socket.close()
+            sys.exit(1)
+
+        # Otherwise, the response is the encrypted symmetric key (raw bytes, so we don't .decode() it!)
+        sym_key = asym_decrypt(server_response, username + "_private.pem")
+
+
+    except socket.error as e:
+        print('Error in client socket creation:',e)
+        client_socket.close()
+        sys.exit(1)    
+
+    while True:
+
+        try:
+            menu = sym_decrypt(client_socket.recv(256), sym_key)
+            choice = input(menu).strip() # get the choice from the user
+            client_socket.send(sym_encrypt(choice, sym_key)) # send choice to server
+
+            if choice == '1':
+                # send email protocol
+                try:
+                    receivers = input("Enter destinations (separated by ;): ")
+                    title = input("Enter title: ")
+    
+                    file_choice = input("Would you like to load contents from a file?(Y/N) ").strip().upper() # Asks if the user wants to type the message or load it from a file
+
+                    if file_choice == 'Y':
+                        file_name = input("Enter filename: ")
+                        with open(file_name, "r") as f:
+                            content = f.read()
+                    else:
+                        content = input("Enter message contents: ")
+
+                    email_message = build_email_message(username, receivers, title, content) #build email format 
+                    client_socket.send(sym_encrypt(email_message.encode(), sym_key)) # sends email to server 
+                    print("The message is sent to the server.")
+
+                except FileNotFoundError:
+                    print("File not found.")
+                except ValueError as e:
+                    print("Email content error:", e)
+                
+            elif choice == '2':
+                # inbox display subprotocol
+                print(sym_decrypt(client_socket.recv(2048), sym_key))
+                ok_msg = "OK"
+                client_socket.send(sym_encrypt(ok_msg.encode(), sym_key))
+
+            elif choice == '3':
+                prompt_msg = sym_decrypt(client_socket.recv(1024), sym_key)
+                print(prompt_msg)
+                index_choice = input().strip() # get index of needed email from user
+                if not index_choice:
+                    index_choice = "0"
+
+                client_socket.send(sym_encrypt(index_choice.encode(), sym_key)) # send index
+
+                email_str = ""
+                while True:
+                    data = client_socket.recv(1024)
+                    decrypted = sym_decrypt(data, sym_key)
+
+                    if "<<EOF>>" in decrypted:
+                        email_str += decrypted.replace("<<EOF>>", "")
+                        break
+                    email_str += decrypted
+                print(email_str)
+                client_socket.send(sym_encrypt(b"OK", sym_key))
+
+            elif choice == '4':
+                print("The connection is terminated with server")
+                sys.exit(1)
+
+        except socket.error as e:
+            print('Error:',e)
+            client_socket.close()
+            sys.exit(1)
+
+client()
