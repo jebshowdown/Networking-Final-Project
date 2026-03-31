@@ -171,8 +171,7 @@ def client():
 
         try:
             menu = sym_decrypt(client_socket.recv(256), sym_key)
-            print(menu)
-            choice = input().strip() # get the choice from the user
+            choice = input(menu).strip() # get the choice from the user
             client_socket.send(sym_encrypt(choice, sym_key)) # send choice to server
 
             if choice == '1':
@@ -192,7 +191,6 @@ def client():
 
                     email_message = build_email_message(username, receivers, title, content) #build email format 
                     client_socket.send(sym_encrypt(email_message.encode(), sym_key)) # sends email to server 
-
                     print("The message is sent to the server.")
 
                 except FileNotFoundError:
